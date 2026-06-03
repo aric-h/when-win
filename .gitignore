@@ -1,0 +1,11 @@
+# python stuff
+**/__pycache__/
+**/.venv
+
+# local db versions
+local_data/*
+
+# misc.
+scratch.md
+**/scratch.md
+.DS_Store
