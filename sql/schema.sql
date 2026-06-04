@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS team_games (
     pts_against INTEGER,
     game_type TEXT,
     is_championship_clinching BOOLEAN DEFAULT FALSE,
+    is_series_clinching BOOLEAN DEFAULT FALSE,
     PRIMARY KEY (game_id, team_id),
     CHECK (result IN ('W', 'L', 'T')),
     CHECK (game_type IN ('regular', 'postseason'))

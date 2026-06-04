@@ -6,9 +6,10 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+
 import streamlit as st
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "whenwin.duckdb"
+DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "local_data" / "whenwin.duckdb"
 
 
 def get_db_path() -> str:

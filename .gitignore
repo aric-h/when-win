@@ -9,3 +9,4 @@ local_data/*
 scratch.md
 **/scratch.md
 .DS_Store
+.claude/*
