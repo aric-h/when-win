@@ -36,62 +36,22 @@ def load_location_groups(db_path: str) -> pd.DataFrame:
 def build_location_game_days_sql() -> str:
     # Keep this query self-contained so it can be moved into a view later if desired.
     return """
-WITH base AS (
-  SELECT
+WITH dedup AS (
+  SELECT DISTINCT
     tg.date,
     tlg.location_group_id,
     tg.league,
-    tg.season,
     tg.team_id,
     t.team_name,
     tg.result,
     tg.game_type,
-    COALESCE(tg.is_championship_clinching, FALSE) AS is_championship_clinching
+    COALESCE(tg.is_series_clinching, FALSE)       AS is_series_clinching,
+    COALESCE(tg.is_championship_clinching, FALSE)  AS is_championship_clinching
   FROM team_games tg
   JOIN team_location_groups tlg ON tlg.team_id = tg.team_id
   JOIN teams t ON t.team_id = tg.team_id
   WHERE tg.date IS NOT NULL
     AND tg.result IS NOT NULL
-),
-series_clinch AS (
-  -- Only NBA/NHL have series manifests today; NFL/MLB will always be false here.
-  SELECT DISTINCT
-    tg.league,
-    tg.game_id,
-    tg.team_id,
-    TRUE AS is_series_clinching
-  FROM team_games tg
-  JOIN postseason_series ps
-    ON ps.league = tg.league
-   AND ps.season = tg.season
-   AND ps.series_end_date = tg.date
-   AND tg.team_id IN (ps.team_id_a, ps.team_id_b)
-   AND tg.opponent_team_id IN (ps.team_id_a, ps.team_id_b)
-  WHERE tg.result = 'W'
-),
-with_flags AS (
-  SELECT
-    b.*,
-    COALESCE(sc.is_series_clinching, FALSE) AS is_series_clinching
-  FROM base b
-  LEFT JOIN team_games tg
-    ON tg.league = b.league AND tg.season = b.season AND tg.team_id = b.team_id AND tg.date = b.date
-   AND tg.result = b.result
-  LEFT JOIN series_clinch sc
-    ON sc.league = b.league AND sc.team_id = b.team_id AND sc.game_id = tg.game_id
-),
-dedup AS (
-  SELECT DISTINCT
-    date,
-    location_group_id,
-    league,
-    team_id,
-    team_name,
-    result,
-    game_type,
-    is_series_clinching,
-    is_championship_clinching
-  FROM with_flags
 ),
 daily AS (
   SELECT
@@ -176,55 +136,33 @@ def load_day_games(db_path: str, day: str, location_group_id: str) -> pd.DataFra
     con = get_con(db_path)
     return con.execute(
         """
-        WITH base AS (
-          SELECT
-            tg.date,
-            tg.league,
-            tg.season,
-            tg.game_id,
-            tg.team_id,
-            t.city || ' ' || t.team_name AS team_label,
-            tg.opponent_team_id,
-            o.city || ' ' || o.team_name AS opponent_label,
-            tg.result,
-            tg.pts_for,
-            tg.pts_against,
-            tg.game_type,
-            COALESCE(tg.is_championship_clinching, FALSE) AS is_championship_clinching
-          FROM team_games tg
-          JOIN team_location_groups tlg ON tlg.team_id = tg.team_id
-          JOIN teams t ON t.team_id = tg.team_id
-          JOIN teams o ON o.team_id = tg.opponent_team_id
-          WHERE tg.date = ?
-            AND tlg.location_group_id = ?
-            AND tg.result IS NOT NULL
-        ),
-        series_clinch AS (
-          SELECT DISTINCT
-            tg.league,
-            tg.game_id,
-            tg.team_id,
-            TRUE AS is_series_clinching
-          FROM team_games tg
-          JOIN postseason_series ps
-            ON ps.league = tg.league
-           AND ps.season = tg.season
-           AND ps.series_end_date = tg.date
-           AND tg.team_id IN (ps.team_id_a, ps.team_id_b)
-           AND tg.opponent_team_id IN (ps.team_id_a, ps.team_id_b)
-          WHERE tg.result = 'W'
-        )
         SELECT
-          b.*,
+          tg.date,
+          tg.league,
+          tg.season,
+          tg.game_id,
+          tg.team_id,
+          t.city || ' ' || t.team_name AS team_label,
+          tg.opponent_team_id,
+          o.city || ' ' || o.team_name AS opponent_label,
+          tg.result,
+          tg.pts_for,
+          tg.pts_against,
+          tg.game_type,
           pgr.round_order AS playoff_round_order,
-          pgr.round_name AS playoff_round,
-          COALESCE(sc.is_series_clinching, FALSE) AS is_series_clinching
-        FROM base b
+          pgr.round_name  AS playoff_round,
+          COALESCE(tg.is_series_clinching, FALSE)      AS is_series_clinching,
+          COALESCE(tg.is_championship_clinching, FALSE) AS is_championship_clinching
+        FROM team_games tg
+        JOIN team_location_groups tlg ON tlg.team_id = tg.team_id
+        JOIN teams t ON t.team_id = tg.team_id
+        JOIN teams o ON o.team_id = tg.opponent_team_id
         LEFT JOIN postseason_game_rounds pgr
-          ON pgr.league = b.league AND pgr.game_id = b.game_id
-        LEFT JOIN series_clinch sc
-          ON sc.league = b.league AND sc.game_id = b.game_id AND sc.team_id = b.team_id
-        ORDER BY b.league, game_type DESC, team_label
+          ON pgr.league = tg.league AND pgr.game_id = tg.game_id
+        WHERE tg.date = ?
+          AND tlg.location_group_id = ?
+          AND tg.result IS NOT NULL
+        ORDER BY tg.league, tg.game_type DESC, team_label
         """,
         [day, location_group_id],
     ).df()
