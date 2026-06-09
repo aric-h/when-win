@@ -17,8 +17,14 @@ import time
 from datetime import date, timedelta
 
 import requests
-
-from api_utils import DEFAULT_DB, DEFAULT_SCHEMA, connect, latest_result_date, resolve_team_id, upsert_games
+from api_utils import (
+    DEFAULT_DB,
+    DEFAULT_SCHEMA,
+    connect,
+    latest_result_date,
+    resolve_team_id,
+    upsert_games,
+)
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 
@@ -61,10 +67,10 @@ TEAM_ID_MAP: dict[int, tuple[str, str]] = {
 # MLB Stats API gameType codes we care about
 GAME_TYPES = {
     "R": "regular",
-    "F": "postseason",   # Wild Card
-    "D": "postseason",   # Division Series
-    "L": "postseason",   # League Championship Series
-    "W": "postseason",   # World Series
+    "F": "postseason",  # Wild Card
+    "D": "postseason",  # Division Series
+    "L": "postseason",  # League Championship Series
+    "W": "postseason",  # World Series
 }
 
 CHUNK_DAYS = 30  # fetch in monthly chunks to keep requests manageable
@@ -75,7 +81,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--db", default=DEFAULT_DB)
     p.add_argument("--schema", default=DEFAULT_SCHEMA)
     p.add_argument("--from-date", default=None, help="Override start date (YYYY-MM-DD)")
-    p.add_argument("--to-date", default=None, help="Override end date (YYYY-MM-DD), defaults to today")
+    p.add_argument(
+        "--to-date",
+        default=None,
+        help="Override end date (YYYY-MM-DD), defaults to today",
+    )
     return p.parse_args()
 
 
@@ -148,7 +158,7 @@ def main() -> None:
                 skipped += 1
                 continue
 
-            game_date = date.fromisoformat(g["gameDate"][:10])
+            game_date = date.fromisoformat(g["officialDate"])
             season = int(g["season"])
             game_pk = g["gamePk"]
 
@@ -167,8 +177,12 @@ def main() -> None:
             try:
                 away_city, away_name = api_team_to_city_name(away_team["id"])
                 home_city, home_name = api_team_to_city_name(home_team["id"])
-                away_id = resolve_team_id(con, "MLB", season, away_city, away_name, team_cache)
-                home_id = resolve_team_id(con, "MLB", season, home_city, home_name, team_cache)
+                away_id = resolve_team_id(
+                    con, "MLB", season, away_city, away_name, team_cache
+                )
+                home_id = resolve_team_id(
+                    con, "MLB", season, home_city, home_name, team_cache
+                )
             except ValueError as e:
                 print(f"  SKIP: {e}")
                 skipped += 1
@@ -183,13 +197,41 @@ def main() -> None:
 
             game_id = f"mlb_{game_pk}"
 
-            all_rows.append((game_id, game_date, "MLB", season, away_id, home_id, away_res, away_score, home_score, game_type))
-            all_rows.append((game_id, game_date, "MLB", season, home_id, away_id, home_res, home_score, away_score, game_type))
+            all_rows.append(
+                (
+                    game_id,
+                    game_date,
+                    "MLB",
+                    season,
+                    away_id,
+                    home_id,
+                    away_res,
+                    away_score,
+                    home_score,
+                    game_type,
+                )
+            )
+            all_rows.append(
+                (
+                    game_id,
+                    game_date,
+                    "MLB",
+                    season,
+                    home_id,
+                    away_id,
+                    home_res,
+                    home_score,
+                    away_score,
+                    game_type,
+                )
+            )
 
         chunk_start += timedelta(days=CHUNK_DAYS)
 
     inserted = upsert_games(con, all_rows)
-    print(f"Inserted {inserted} MLB games ({len(all_rows)} team-game rows), skipped {skipped}")
+    print(
+        f"Inserted {inserted} MLB games ({len(all_rows)} team-game rows), skipped {skipped}"
+    )
 
 
 if __name__ == "__main__":
