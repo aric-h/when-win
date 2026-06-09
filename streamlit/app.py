@@ -77,6 +77,7 @@ SELECT
 FROM daily d
 LEFT JOIN location_groups lg ON lg.location_group_id = d.location_group_id
 WHERE d.winners >= 3
+  AND d.leagues_winning >= 3
 """
 
 

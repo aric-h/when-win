@@ -2,6 +2,10 @@
 **/__pycache__/
 **/.venv
 
+# ai stuff
+handoff_docs/*
+.claude/*
+
 # local db versions
 local_data/*
 
@@ -9,4 +13,3 @@ local_data/*
 scratch.md
 **/scratch.md
 .DS_Store
-.claude/*

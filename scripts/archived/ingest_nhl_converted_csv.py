@@ -36,12 +36,26 @@ class TeamEra:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--db", default="data/whenwin.duckdb")
+    p.add_argument("--db", default="local_data/whenwin.duckdb")
     p.add_argument("--schema", default="sql/schema.sql")
-    p.add_argument("--dir", default="raw/nhl/converted")
-    p.add_argument("--from-start-year", type=int, default=1976, help="Start year from filename (e.g., 1976 in 1976-1977.csv)")
-    p.add_argument("--to-start-year", type=int, default=2014, help="Start year from filename (e.g., 2014 in 2014-2015.csv)")
-    p.add_argument("--replace", action="store_true", help="Delete existing NHL regular-season rows for seasons ingested")
+    p.add_argument("--dir", default="/Users/aric/code/whenwin/raw/nhl/converted")
+    p.add_argument(
+        "--from-start-year",
+        type=int,
+        default=1976,
+        help="Start year from filename (e.g., 1976 in 1976-1977.csv)",
+    )
+    p.add_argument(
+        "--to-start-year",
+        type=int,
+        default=2014,
+        help="Start year from filename (e.g., 2014 in 2014-2015.csv)",
+    )
+    p.add_argument(
+        "--replace",
+        action="store_true",
+        help="Delete existing NHL regular-season rows for seasons ingested",
+    )
     return p.parse_args()
 
 
@@ -95,20 +109,31 @@ def load_team_eras(con: duckdb.DuckDBPyConnection) -> dict[str, list[TeamEra]]:
         ey = int(end_year) if end_year is not None else None
         full = f"{city} {team_name}".strip()
         key = norm_key(full)
-        out.setdefault(key, []).append(TeamEra(key=key, team_id=str(team_id), start_year=sy, end_year=ey))
+        out.setdefault(key, []).append(
+            TeamEra(key=key, team_id=str(team_id), start_year=sy, end_year=ey)
+        )
 
     return out
 
 
-def resolve_team_id(full_team_name: str, season_end: int, eras_index: dict[str, list[TeamEra]]) -> str:
+def resolve_team_id(
+    full_team_name: str, season_end: int, eras_index: dict[str, list[TeamEra]]
+) -> str:
     key = apply_alias(full_team_name)
     eras = eras_index.get(key)
     if not eras:
         raise ValueError(f"No NHL team match for {full_team_name!r} (key={key})")
 
-    matches = [e for e in eras if e.start_year <= season_end and (e.end_year is None or e.end_year >= season_end)]
+    matches = [
+        e
+        for e in eras
+        if e.start_year <= season_end
+        and (e.end_year is None or e.end_year >= season_end)
+    ]
     if not matches:
-        raise ValueError(f"No NHL team era contains season={season_end} for {full_team_name!r}")
+        raise ValueError(
+            f"No NHL team era contains season={season_end} for {full_team_name!r}"
+        )
 
     # If boundaries overlap (e.g., one era ends the same year another starts), pick the most recent start_year.
     best = max(matches, key=lambda e: e.start_year)
@@ -134,7 +159,9 @@ def main() -> None:
             files.append(p)
 
     if not files:
-        raise SystemExit(f"No NHL converted files found in {dirp} for start-year range {args.from_start_year}-{args.to_start_year}")
+        raise SystemExit(
+            f"No NHL converted files found in {dirp} for start-year range {args.from_start_year}-{args.to_start_year}"
+        )
 
     seasons_seen: set[int] = set()
     for p in files:
@@ -189,8 +216,34 @@ def main() -> None:
                 suffix = "" if n == 1 else f"_g{n}"
                 game_id = f"nhl_{season_end}_{date}_{visitor_team_id}_at_{home_team_id}{suffix}"
 
-                rows_to_insert.append((game_id, date, "NHL", season_end, visitor_team_id, home_team_id, v_res, v_goals, h_goals, "regular"))
-                rows_to_insert.append((game_id, date, "NHL", season_end, home_team_id, visitor_team_id, h_res, h_goals, v_goals, "regular"))
+                rows_to_insert.append(
+                    (
+                        game_id,
+                        date,
+                        "NHL",
+                        season_end,
+                        visitor_team_id,
+                        home_team_id,
+                        v_res,
+                        v_goals,
+                        h_goals,
+                        "regular",
+                    )
+                )
+                rows_to_insert.append(
+                    (
+                        game_id,
+                        date,
+                        "NHL",
+                        season_end,
+                        home_team_id,
+                        visitor_team_id,
+                        h_res,
+                        h_goals,
+                        v_goals,
+                        "regular",
+                    )
+                )
                 inserted_games += 1
 
     con.executemany(
@@ -202,11 +255,14 @@ def main() -> None:
         rows_to_insert,
     )
 
-    print(f"Inserted {inserted_games} NHL games ({len(rows_to_insert)} team-game rows) from converted CSVs")
+    print(
+        f"Inserted {inserted_games} NHL games ({len(rows_to_insert)} team-game rows) from converted CSVs"
+    )
     if seasons_seen:
-        print(f"Seasons(end-year): {min(seasons_seen)}..{max(seasons_seen)} ({len(seasons_seen)} files)")
+        print(
+            f"Seasons(end-year): {min(seasons_seen)}..{max(seasons_seen)} ({len(seasons_seen)} files)"
+        )
 
 
 if __name__ == "__main__":
     main()
-

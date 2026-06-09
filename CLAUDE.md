@@ -113,3 +113,28 @@ Each script auto-detects the latest result date and only fetches forward. All ar
 - NHL API reference: https://api-web.nhle.com/v1/ (no official docs; community reference at https://github.com/Zmalski/NHL-API-Reference)
 - MLB Stats API: https://statsapi.mlb.com/api/v1/ — append `?fields=...` to any endpoint for field discovery
 - nba_api package docs: https://github.com/swar/nba_api
+
+---
+
+## Intent Layer
+
+All source directories are small (<5k tokens each); no child AGENTS.md files exist. This section is the full agent orientation.
+
+### Entry Points by Task
+
+| Task | Start here |
+|------|-----------|
+| Add/fix ingestion | `scripts/api_utils.py` (shared helpers), then the relevant `scripts/ingest_*.py` |
+| Schema change | `sql/schema.sql` (source of truth) + `ALTER TABLE` on live DB |
+| UI / display logic | `streamlit/app.py` (single file) |
+| Analytical query | `sql/basic_queries.sql`, run via `duckdb -readonly local_data/whenwin.duckdb` |
+| Geo-market logic | Join `team_location_groups` — never hardcode city-to-team mappings |
+
+### Global Invariants (most likely to trip up an agent)
+
+- **2 rows per game**: `team_games` stores one row per team per game. Aggregations must avoid double-counting.
+- **Clinch detection**: use `team_games.is_series_clinching` directly. Never re-derive it from `postseason_series` joins (causes fan-out).
+- **Schema sync**: every schema change requires editing `sql/schema.sql` AND running `ALTER TABLE` on the live DB. One without the other leaves them out of sync.
+- **game_ids are sacred**: never generate or infer them — they must originate from the ingestion source. MLB has two formats (Retrosheet vs `mlb_<gamePk>`); both are valid but don't mix.
+- **Single writer**: DuckDB allows only one writer at a time. If Streamlit is running, use `-readonly` flag or stop Streamlit first.
+- **Run from repo root**: all scripts use paths relative to `/Users/aric/code/when-win`. Running from inside `scripts/` will break path resolution.

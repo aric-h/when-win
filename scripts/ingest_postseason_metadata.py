@@ -246,11 +246,19 @@ def process_nhl(con, seasons: list[int]) -> None:
             (r[2].lower(), r[3].lower()): r[0] for r in rows_abbrev
         }
 
+        # NHL API always returns commonName="Ducks" even for Mighty Ducks era seasons.
+        # Applied as fallback AFTER direct lookup fails (post-2006 "Ducks" resolves directly).
+        _COMMON_NAME_ALIASES = {"ducks": "mighty ducks"}
+
         def nhl_team_id(team_dict: dict) -> str | None:
             common = team_dict.get("commonName", {}).get("default", "").lower()
             # Direct match
             if common in name_to_id:
                 return name_to_id[common]
+            # Legacy name alias (e.g. API returns "Ducks" for Mighty Ducks era)
+            aliased = _COMMON_NAME_ALIASES.get(common, common)
+            if aliased != common and aliased in name_to_id:
+                return name_to_id[aliased]
             # Normalised match: strip spaces (handles "Blackhawks" vs "Black Hawks")
             common_nospace = common.replace(" ", "").replace("-", "")
             for name_key, tid in name_to_id.items():
