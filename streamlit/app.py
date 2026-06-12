@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 
 import duckdb
@@ -10,6 +11,20 @@ import pandas as pd
 import streamlit as st
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "local_data" / "whenwin.duckdb"
+SQL_DIR = Path(__file__).resolve().parent / "sql"
+
+
+# ── SQL loader ──────────────────────────────────────────────────────────────
+
+
+@lru_cache(maxsize=None)
+def _read_sql(name: str) -> str:
+    """Read and cache a .sql file from the sql/ directory."""
+    path = SQL_DIR / f"{name}.sql"
+    return path.read_text()
+
+
+# ── DB helpers ──────────────────────────────────────────────────────────────
 
 
 def get_db_path() -> str:
@@ -24,61 +39,7 @@ def get_con(db_path: str) -> duckdb.DuckDBPyConnection:
 @st.cache_data(ttl=60)
 def load_location_groups(db_path: str) -> pd.DataFrame:
     con = get_con(db_path)
-    return con.execute(
-        """
-        SELECT location_group_id, name
-        FROM location_groups
-        ORDER BY name
-        """
-    ).df()
-
-
-def build_location_game_days_sql() -> str:
-    # Keep this query self-contained so it can be moved into a view later if desired.
-    return """
-WITH dedup AS (
-  SELECT DISTINCT
-    tg.date,
-    tlg.location_group_id,
-    tg.league,
-    tg.team_id,
-    t.team_name,
-    tg.result,
-    tg.game_type,
-    COALESCE(tg.is_series_clinching, FALSE)       AS is_series_clinching,
-    COALESCE(tg.is_championship_clinching, FALSE)  AS is_championship_clinching
-  FROM team_games tg
-  JOIN team_location_groups tlg ON tlg.team_id = tg.team_id
-  JOIN teams t ON t.team_id = tg.team_id
-  WHERE tg.date IS NOT NULL
-    AND tg.result IS NOT NULL
-),
-daily AS (
-  SELECT
-    date,
-    location_group_id,
-    COUNT(DISTINCT team_id) AS teams_playing,
-    COUNT(DISTINCT CASE WHEN result = 'W' THEN team_id END) AS winners,
-    COUNT(DISTINCT CASE WHEN result = 'L' THEN team_id END) AS losers,
-    COUNT(DISTINCT CASE WHEN result = 'T' THEN team_id END) AS ties,
-    COUNT(DISTINCT league) AS leagues_playing,
-    COUNT(DISTINCT CASE WHEN result = 'W' THEN league END) AS leagues_winning,
-    MAX(CASE WHEN game_type = 'postseason' THEN 1 ELSE 0 END) = 1 AS has_playoff_games,
-    MIN(CASE WHEN game_type = 'postseason' THEN 1 ELSE 0 END) = 1 AS all_games_playoffs,
-    COUNT(DISTINCT CASE WHEN is_series_clinching AND result='W' THEN team_id END) AS series_clinching_wins,
-    COUNT(DISTINCT CASE WHEN is_championship_clinching AND result='W' THEN team_id END) AS championship_clinching_wins
-  FROM dedup
-  GROUP BY 1,2
-)
-SELECT
-  d.*,
-  lg.name AS location_group_name,
-  CASE WHEN d.winners = d.teams_playing THEN 'Sweep' ELSE 'Partial' END AS sweep_status
-FROM daily d
-LEFT JOIN location_groups lg ON lg.location_group_id = d.location_group_id
-WHERE d.winners >= 3
-  AND d.leagues_winning >= 3
-"""
+    return con.execute(_read_sql("location_groups")).df()
 
 
 @st.cache_data(ttl=60)
@@ -91,7 +52,7 @@ def load_location_game_days(
     max_date: date | None,
 ) -> pd.DataFrame:
     con = get_con(db_path)
-    sql = build_location_game_days_sql()
+    sql = _read_sql("location_game_days")
 
     where = []
     params: list[object] = []
@@ -133,40 +94,9 @@ def load_location_game_days(
 
 
 @st.cache_data(ttl=60)
-def load_day_games(db_path: str, day: str, location_group_id: str) -> pd.DataFrame:
+def load_game_days(db_path: str, day: str, location_group_id: str) -> pd.DataFrame:
     con = get_con(db_path)
-    return con.execute(
-        """
-        SELECT
-          tg.date,
-          tg.league,
-          tg.season,
-          tg.game_id,
-          tg.team_id,
-          t.city || ' ' || t.team_name AS team_label,
-          tg.opponent_team_id,
-          o.city || ' ' || o.team_name AS opponent_label,
-          tg.result,
-          tg.pts_for,
-          tg.pts_against,
-          tg.game_type,
-          pgr.round_order AS playoff_round_order,
-          pgr.round_name  AS playoff_round,
-          COALESCE(tg.is_series_clinching, FALSE)      AS is_series_clinching,
-          COALESCE(tg.is_championship_clinching, FALSE) AS is_championship_clinching
-        FROM team_games tg
-        JOIN team_location_groups tlg ON tlg.team_id = tg.team_id
-        JOIN teams t ON t.team_id = tg.team_id
-        JOIN teams o ON o.team_id = tg.opponent_team_id
-        LEFT JOIN postseason_game_rounds pgr
-          ON pgr.league = tg.league AND pgr.game_id = tg.game_id
-        WHERE tg.date = ?
-          AND tlg.location_group_id = ?
-          AND tg.result IS NOT NULL
-        ORDER BY tg.league, tg.game_type DESC, team_label
-        """,
-        [day, location_group_id],
-    ).df()
+    return con.execute(_read_sql("game_days"), [day, location_group_id]).df()
 
 
 def main() -> None:
@@ -274,13 +204,12 @@ def main() -> None:
         chosen_name = str(latest["location_group_name"])
 
     st.caption(f"{chosen_day} — {chosen_name} (`{chosen_loc}`)")
-    games = load_day_games(db_path, chosen_day, chosen_loc)
+    games = load_game_days(db_path, chosen_day, chosen_loc)
 
     if games.empty:
         st.info("No games found for that date/location (or results not populated).")
         return
 
-    # Display per-league sections.
     for league in ["MLB", "NBA", "NFL", "NHL"]:
         g = games[games["league"] == league]
         if g.empty:
