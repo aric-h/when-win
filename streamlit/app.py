@@ -169,6 +169,7 @@ def main() -> None:
             "date",
             "location_group_name",
             "location_group_id",
+            "winners",
             "teams_playing",
             "leagues_playing",
             "sweep_status",
@@ -187,6 +188,7 @@ def main() -> None:
     column_config = {
         "date": st.column_config.TextColumn("Date"),
         "location_group_name": st.column_config.TextColumn("Location"),
+        "winners": st.column_config.NumberColumn("Wins", format="%d"),
         "teams_playing": st.column_config.NumberColumn("Teams", format="%d"),
         "leagues_playing": st.column_config.NumberColumn("Leagues", format="%d"),
         "sweep": st.column_config.CheckboxColumn("Sweep", disabled=True),
