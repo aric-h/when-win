@@ -100,7 +100,7 @@ def load_game_days(db_path: str, day: str, location_group_id: str) -> pd.DataFra
 
 
 def main() -> None:
-    st.set_page_config(page_title="WhenWin (Local)", layout="wide")
+    st.set_page_config(page_title="WhenWin", layout="wide")
     st.title("WhenWin — 3+ Win Days by Region")
 
     db_path = get_db_path()
@@ -108,23 +108,26 @@ def main() -> None:
         st.error(f"DuckDB file not found: {db_path}")
         st.stop()
 
-    with st.sidebar:
-        st.header("Filters")
-        groups = load_location_groups(db_path)
-        options = ["__all__"] + groups["location_group_id"].tolist()
-        labels = {"__all__": "All locations"} | dict(
-            zip(groups["location_group_id"], groups["name"])
-        )
+    # ── Inline filters (no sidebar) ────────────────────────────────────────
+    groups = load_location_groups(db_path)
+    options = ["__all__"] + groups["location_group_id"].tolist()
+    labels = {"__all__": "All locations"} | dict(
+        zip(groups["location_group_id"], groups["name"])
+    )
+
+    filter_cols = st.columns([2, 2, 2, 1, 1])
+    with filter_cols[0]:
         location = st.selectbox(
-            "Location Group",
+            "Location",
             options=options,
             format_func=lambda x: labels.get(x, x),
         )
-
+    with filter_cols[1]:
         playoffs_filter = st.selectbox(
             "Playoffs",
             ["Any", "Has Playoff Games", "All Games Playoffs", "No Playoff Games"],
         )
+    with filter_cols[2]:
         clinch_filter = st.selectbox(
             "Clinching Wins",
             [
@@ -135,14 +138,16 @@ def main() -> None:
                 "Championship Clinchers",
             ],
         )
-
+    with filter_cols[3]:
         min_date = st.date_input("From", value=None)
-        max_date = st.date_input("To", value=None)
         if isinstance(min_date, tuple):
             min_date = None
+    with filter_cols[4]:
+        max_date = st.date_input("To", value=None)
         if isinstance(max_date, tuple):
             max_date = None
 
+    # ── Load & prepare data ────────────────────────────────────────────────
     df = load_location_game_days(
         db_path=db_path,
         location_group_id=location,
@@ -152,46 +157,58 @@ def main() -> None:
         max_date=max_date,
     )
 
-    st.caption(f"DB: `{db_path}` • Rows: {len(df)}")
+    st.caption(f"Rows: {len(df)}")
 
     if df.empty:
         st.info("No results for the selected filters.")
         return
 
-    latest = df.iloc[0]
-    st.info(
-        f"Latest: {latest['date']} — {latest['location_group_name']} "
-        f"({int(latest['winners'])} wins / {int(latest['leagues_winning'])} leagues; {latest['sweep_status']})"
-    )
-
+    # ── Build display dataframe ────────────────────────────────────────────
     df_view = df[
         [
             "date",
             "location_group_name",
             "location_group_id",
-            "winners",
             "teams_playing",
-            "leagues_winning",
             "leagues_playing",
             "sweep_status",
             "has_playoff_games",
-            "all_games_playoffs",
             "series_clinching_wins",
             "championship_clinching_wins",
         ]
-    ]
+    ].copy()
+
+    # Date → yyyy-mm-dd string (strip timestamp)
+    df_view["date"] = pd.to_datetime(df_view["date"]).dt.strftime("%Y-%m-%d")
+
+    # Sweep as boolean for checkbox column
+    df_view["sweep"] = df_view["sweep_status"] == "Sweep"
+
+    column_config = {
+        "date": st.column_config.TextColumn("Date"),
+        "location_group_name": st.column_config.TextColumn("Location"),
+        "teams_playing": st.column_config.NumberColumn("Teams", format="%d"),
+        "leagues_playing": st.column_config.NumberColumn("Leagues", format="%d"),
+        "sweep": st.column_config.CheckboxColumn("Sweep", disabled=True),
+        "has_playoff_games": st.column_config.CheckboxColumn("Playoffs", disabled=True),
+        "series_clinching_wins": st.column_config.NumberColumn("Series Clinch", format="%d"),
+        "championship_clinching_wins": st.column_config.NumberColumn("Champ Clinch", format="%d"),
+    }
 
     selection = st.dataframe(
-        df_view.drop(columns=["location_group_id"]),
+        df_view.drop(columns=["location_group_id", "sweep_status"]),
         use_container_width=True,
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
+        column_config=column_config,
     )
 
+    # ── Day Detail ─────────────────────────────────────────────────────────
     st.divider()
     st.subheader("Day Detail")
 
+    latest = df.iloc[0]
     if selection and selection.selection and selection.selection.get("rows"):
         i = selection.selection["rows"][0]
         chosen = df.iloc[i]
@@ -203,7 +220,7 @@ def main() -> None:
         chosen_loc = str(latest["location_group_id"])
         chosen_name = str(latest["location_group_name"])
 
-    st.caption(f"{chosen_day} — {chosen_name} (`{chosen_loc}`)")
+    st.caption(f"{chosen_day} — {chosen_name}")
     games = load_game_days(db_path, chosen_day, chosen_loc)
 
     if games.empty:
