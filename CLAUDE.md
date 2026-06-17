@@ -18,6 +18,42 @@ and a custom team-picker page for arbitrary cross-market comparisons.
 
 ---
 
+## GitHub Issue Creation Guidelines
+
+When creating issues for this repo, follow this structure so that both humans and agents
+can pick them up and execute without follow-up questions.
+
+### Required Sections
+
+| Section | Purpose | When to use |
+|---------|---------|-------------|
+| `## Summary` or `## Problem` | One-paragraph description of the feature or bug | Always — every issue starts here |
+| `## Current Implementation` | What exists today (include file paths + code snippets) | When modifying existing behavior |
+| `## Desired Behavior` or `## Desired Implementation` | The target end-state, as concretely as possible | Always |
+| `## Requirements` | Bullet or sub-headed breakdown of discrete deliverables | When the change has multiple parts |
+| `## Acceptance Criteria` | Checkbox list (`- [ ]`) of verifiable conditions | When there are testable outcomes |
+| `## Implementation Notes for Agent` | File pointers, relevant functions, API details, caveats, and Streamlit/DuckDB specifics | Always |
+
+### Rules
+
+1. **File path first** — every issue must name the file(s) to change (e.g., `**File**: streamlit/app.py`).
+2. **Code snippets for context** — include relevant current code blocks so the implementing agent doesn't have to search. Use fenced code blocks with language tags.
+3. **Name specific functions/widgets** — reference the Streamlit widget, SQL query file, or Python function by name (e.g., `st.slider()`, `load_location_game_days()`, `location_game_days.sql`).
+4. **Call out caveats and anti-patterns** — if there's a wrong way to do it, say so explicitly (e.g., "do NOT use the `season` column").
+5. **State scope boundaries** — say what's in-scope and what's explicitly out ("Placement TBD", "does NOT respect active page filters").
+6. **Label every issue** — use `enhancement` for new features, `bug` for defects.
+7. **Link related issues/PRs** — use `Closes #N` or reference related issue numbers where applicable.
+8. **Keep it implementation-ready** — an agent should be able to start coding from the issue alone, without needing to ask clarifying questions.
+
+### Anti-Patterns
+
+- ❌ Issue body with only a title and 1-2 sentences (no file pointers, no code context, no acceptance criteria)
+- ❌ Vague desired behavior ("make it better", "fix the UI")
+- ❌ Missing file/function references — forces the agent to grep the entire codebase
+- ❌ No mention of what the current behavior is (for bugs)
+
+---
+
 ## Non-Obvious Tooling
 
 | Tool | Purpose |
