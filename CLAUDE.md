@@ -24,6 +24,8 @@ and a custom team-picker page for arbitrary cross-market comparisons.
 |------|---------|
 | `duckdb` CLI | Installed system-wide; use `duckdb local_data/whenwin.duckdb` for ad-hoc queries. Add `-readonly` if Streamlit is running. |
 | `.venv/` | Project venv in repo root. Always activate before running scripts: `source .venv/bin/activate`. Packages: `duckdb`, `requests`, `nba_api`. |
+| `scripts/requirements.txt` | Pip deps for ingestion scripts (`duckdb`, `requests`, `nba_api`). Install with `pip install -r scripts/requirements.txt`. |
+| `streamlit/requirements.txt` | Pip deps for UI only (`duckdb`, `pandas`, `streamlit`). |
 | NHL API | `https://api-web.nhle.com/v1/` — official, free, no auth. Key endpoints: `/schedule/{date}`, `/playoff-bracket/{season}`. |
 | NBA API | `nba_api` Python package wrapping `stats.nba.com`. Add `time.sleep(0.6)` between calls to avoid 429s. |
 | MLB API | `https://statsapi.mlb.com/api/v1/` — official, free, no auth. Key endpoint: `/schedule?sportId=1&...`. |
@@ -37,6 +39,7 @@ and a custom team-picker page for arbitrary cross-market comparisons.
 local_data/whenwin.duckdb   ← NOT in git (~85MB, growing)
 sql/schema.sql              ← source of truth for all table definitions
 scripts/
+  requirements.txt          ← pip deps for ingestion scripts (duckdb, requests, nba_api)
   api_utils.py              ← shared: connect(), latest_result_date(), resolve_team_id(), upsert_games()
   ingest_nhl_api.py         ← NHL schedule API → team_games
   ingest_nba_api.py         ← nba_api (stats.nba.com) → team_games
@@ -50,6 +53,7 @@ streamlit/
 **Nightly refresh order** (run from repo root with venv active):
 
 ```bash
+pip install -r scripts/requirements.txt  # ensure deps installed
 python scripts/ingest_nhl_api.py
 python scripts/ingest_nba_api.py
 python scripts/ingest_mlb_api.py
