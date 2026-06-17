@@ -210,17 +210,15 @@ def main() -> None:
     st.divider()
     st.subheader("Day Detail")
 
-    latest = df.iloc[0]
-    if selection and selection.selection and selection.selection.get("rows"):
-        i = selection.selection["rows"][0]
-        chosen = df.iloc[i]
-        chosen_day = str(chosen["date"])
-        chosen_loc = str(chosen["location_group_id"])
-        chosen_name = str(chosen["location_group_name"])
-    else:
-        chosen_day = str(latest["date"])
-        chosen_loc = str(latest["location_group_id"])
-        chosen_name = str(latest["location_group_name"])
+    if not (selection and selection.selection and selection.selection.get("rows")):
+        st.info("Select a row to see game details")
+        return
+
+    i = selection.selection["rows"][0]
+    chosen = df.iloc[i]
+    chosen_day = str(chosen["date"])
+    chosen_loc = str(chosen["location_group_id"])
+    chosen_name = str(chosen["location_group_name"])
 
     st.caption(f"{chosen_day} — {chosen_name}")
     games = load_game_days(db_path, chosen_day, chosen_loc)
