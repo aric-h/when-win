@@ -1,0 +1,15 @@
+[theme.dark]
+primaryColor = "#a855f7"              # Purple-500 - vibrant, code-like accent
+backgroundColor = "#0d1117"           # GitHub-like dark background
+secondaryBackgroundColor = "#161b22"  # Slightly lighter - cards and sections
+textColor = "#f0f6fc"                 # Light blue-white - easy on eyes
+linkColor = "#58a6ff"                 # GitHub-like blue - familiar developer color
+borderColor = "#30363d"               # Dark gray borders
+
+[theme.light]
+primaryColor = "#1976d2"              # Material Blue-700 from Material palette
+backgroundColor = "#ffffff"           # Material Design surface color
+secondaryBackgroundColor = "#f5f5f5"  # Material Grey-100 for elevation
+textColor = "#212121"                 # Material Grey-900 for high contrast
+linkColor = "#1565c0"                 # Material Blue-800 for links
+borderColor = "#e0e0e0"               # Material Grey-300 for dividers
