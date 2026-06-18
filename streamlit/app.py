@@ -202,8 +202,12 @@ def main() -> None:
         "leagues_playing": st.column_config.NumberColumn("Leagues", format="%d"),
         "sweep": st.column_config.CheckboxColumn("Sweep", disabled=True),
         "has_playoff_games": st.column_config.CheckboxColumn("Playoffs", disabled=True),
-        "series_clinching_wins": st.column_config.NumberColumn("Series Clinch", format="%d"),
-        "championship_clinching_wins": st.column_config.NumberColumn("Champ Clinch", format="%d"),
+        "series_clinching_wins": st.column_config.NumberColumn(
+            "Series Clinch", format="%d"
+        ),
+        "championship_clinching_wins": st.column_config.NumberColumn(
+            "Champ Clinch", format="%d"
+        ),
     }
 
     selection = st.dataframe(
@@ -221,43 +225,76 @@ def main() -> None:
 
     if not (selection and selection.selection and selection.selection.get("rows")):
         st.info("Select a row to see game details")
-        return
+    else:
+        i = selection.selection["rows"][0]
+        chosen = df.iloc[i]
+        chosen_day = str(chosen["date"])
+        chosen_loc = str(chosen["location_group_id"])
+        chosen_name = str(chosen["location_group_name"])
 
-    i = selection.selection["rows"][0]
-    chosen = df.iloc[i]
-    chosen_day = str(chosen["date"])
-    chosen_loc = str(chosen["location_group_id"])
-    chosen_name = str(chosen["location_group_name"])
+        st.caption(f"{chosen_day} — {chosen_name}")
+        games = load_game_days(db_path, chosen_day, chosen_loc)
 
-    st.caption(f"{chosen_day} — {chosen_name}")
-    games = load_game_days(db_path, chosen_day, chosen_loc)
+        if games.empty:
+            st.info("No games found for that date/location (or results not populated).")
+        else:
+            for league in ["MLB", "NBA", "NFL", "NHL"]:
+                g = games[games["league"] == league]
+                if g.empty:
+                    continue
+                st.markdown(f"### {league}")
+                st.dataframe(
+                    g[
+                        [
+                            "game_type",
+                            "team_label",
+                            "result",
+                            "pts_for",
+                            "pts_against",
+                            "opponent_label",
+                            "playoff_round",
+                            "is_series_clinching",
+                            "is_championship_clinching",
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-    if games.empty:
-        st.info("No games found for that date/location (or results not populated).")
-        return
+    # ── 3+ Win Leaderboard ─────────────────────────────────────────────────
+    st.divider()
 
-    for league in ["MLB", "NBA", "NFL", "NHL"]:
-        g = games[games["league"] == league]
-        if g.empty:
-            continue
-        st.markdown(f"### {league}")
-        st.dataframe(
-            g[
-                [
-                    "game_type",
-                    "team_label",
-                    "result",
-                    "pts_for",
-                    "pts_against",
-                    "opponent_label",
-                    "playoff_round",
-                    "is_series_clinching",
-                    "is_championship_clinching",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
+    lb_col, chart_col = st.columns(2)
+
+    with lb_col:
+        header_col, toggle_col = st.columns([3, 1], vertical_alignment="center")
+        with header_col:
+            st.subheader("3+ Win Leaderboard")
+        with toggle_col:
+            sweeps_only = st.checkbox("Only Sweeps")
+
+        lb_df = df.copy()
+        if sweeps_only:
+            lb_df = lb_df[lb_df["sweep_status"] == "Sweep"]
+
+        leaderboard = (
+            lb_df.groupby("location_group_name")
+            .size()
+            .reset_index(name="Count")
+            .sort_values("Count", ascending=False)
+            .reset_index(drop=True)
         )
+        leaderboard.index += 1
+        leaderboard.index.name = "Rank"
+        leaderboard.rename(columns={"location_group_name": "Location"}, inplace=True)
+
+        if leaderboard.empty:
+            st.info("No results for the current filters.")
+        else:
+            st.dataframe(leaderboard, use_container_width=True)
+
+    with chart_col:
+        pass  # Reserved for future bar chart
 
 
 if __name__ == "__main__":
