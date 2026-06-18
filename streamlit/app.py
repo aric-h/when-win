@@ -202,8 +202,12 @@ def main() -> None:
         "leagues_playing": st.column_config.NumberColumn("Leagues", format="%d"),
         "sweep": st.column_config.CheckboxColumn("Sweep", disabled=True),
         "has_playoff_games": st.column_config.CheckboxColumn("Playoffs", disabled=True),
-        "series_clinching_wins": st.column_config.NumberColumn("Series Clinch", format="%d"),
-        "championship_clinching_wins": st.column_config.NumberColumn("Champ Clinch", format="%d"),
+        "series_clinching_wins": st.column_config.NumberColumn(
+            "Series Clinch", format="%d"
+        ),
+        "championship_clinching_wins": st.column_config.NumberColumn(
+            "Champ Clinch", format="%d"
+        ),
     }
 
     selection = st.dataframe(
@@ -263,7 +267,7 @@ def main() -> None:
     lb_col, chart_col = st.columns(2)
 
     with lb_col:
-        header_col, toggle_col = st.columns([3, 1])
+        header_col, toggle_col = st.columns([3, 1], vertical_alignment="center")
         with header_col:
             st.subheader("3+ Win Leaderboard")
         with toggle_col:
