@@ -102,6 +102,12 @@ def load_game_days(db_path: str, day: str, location_group_id: str) -> pd.DataFra
     return con.execute(_read_sql("game_days"), [day, location_group_id]).df()
 
 
+@st.cache_data(ttl=60)
+def load_instances_by_year(db_path: str) -> pd.DataFrame:
+    con = get_con(db_path)
+    return con.execute(_read_sql("instances_by_year")).df()
+
+
 def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
     st.title("WhenWin — 3+ Win Days by Region")
@@ -261,7 +267,7 @@ def main() -> None:
                     hide_index=True,
                 )
 
-    # ── 3+ Win Leaderboard ─────────────────────────────────────────────────
+    # ── 3+ Win Leaderboard & Year Chart ────────────────────────────────────
     st.divider()
 
     lb_col, chart_col = st.columns(2)
@@ -294,7 +300,12 @@ def main() -> None:
             st.dataframe(leaderboard, use_container_width=True)
 
     with chart_col:
-        pass  # Reserved for future bar chart
+        st.subheader("Instances by Year")
+        year_df = load_instances_by_year(db_path)
+        if year_df.empty:
+            st.info("No data available.")
+        else:
+            st.bar_chart(year_df, x="year", y="instances", x_label="Year", y_label="Instances")
 
 
 if __name__ == "__main__":
