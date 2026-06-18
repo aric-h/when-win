@@ -5,6 +5,7 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+import altair as alt
 import duckdb
 import pandas as pd
 
@@ -305,7 +306,17 @@ def main() -> None:
         if year_df.empty:
             st.info("No data available.")
         else:
-            st.bar_chart(year_df, x="year", y="instances", x_label="Year", y_label="Instances")
+            zoom = alt.selection_interval(bind="scales", encodings=["x"])
+            chart = (
+                alt.Chart(year_df)
+                .mark_bar()
+                .encode(
+                    x=alt.X("year:O", title="Year"),
+                    y=alt.Y("instances:Q", title="Instances", scale=alt.Scale(domainMin=0)),
+                )
+                .add_params(zoom)
+            )
+            st.altair_chart(chart, use_container_width=True)
 
 
 if __name__ == "__main__":
