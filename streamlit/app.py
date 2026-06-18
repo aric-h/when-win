@@ -311,7 +311,7 @@ def main() -> None:
                 alt.Chart(year_df)
                 .mark_bar()
                 .encode(
-                    x=alt.X("year:O", title="Year"),
+                    x=alt.X("year:Q", title="Year", axis=alt.Axis(format="d")),
                     y=alt.Y("instances:Q", title="Instances", scale=alt.Scale(domainMin=0)),
                 )
                 .add_params(zoom)
