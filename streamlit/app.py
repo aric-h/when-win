@@ -13,6 +13,9 @@ import streamlit as st
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "local_data" / "whenwin.duckdb"
 SQL_DIR = Path(__file__).resolve().parent / "sql"
 
+# Earliest date in the dataset (static — historical data does not change)
+MIN_DATE = date(1978, 10, 1)
+
 
 # ── SQL loader ──────────────────────────────────────────────────────────────
 
@@ -115,7 +118,9 @@ def main() -> None:
         zip(groups["location_group_id"], groups["name"])
     )
 
-    filter_cols = st.columns([2, 2, 2, 1, 1])
+    max_date_bound = date.today()
+
+    filter_cols = st.columns([2, 2, 2, 2])
     with filter_cols[0]:
         location = st.selectbox(
             "Location",
@@ -139,13 +144,17 @@ def main() -> None:
             ],
         )
     with filter_cols[3]:
-        min_date = st.date_input("From", value=None)
-        if isinstance(min_date, tuple):
-            min_date = None
-    with filter_cols[4]:
-        max_date = st.date_input("To", value=None)
-        if isinstance(max_date, tuple):
-            max_date = None
+        date_range = st.slider(
+            "Date Range",
+            min_value=MIN_DATE,
+            max_value=max_date_bound,
+            value=(MIN_DATE, max_date_bound),
+            format="YYYY-MM-DD",
+        )
+
+    # Treat full-range as unfiltered
+    min_date = date_range[0] if date_range[0] != MIN_DATE else None
+    max_date = date_range[1] if date_range[1] != max_date_bound else None
 
     # ── Load & prepare data ────────────────────────────────────────────────
     df = load_location_game_days(
