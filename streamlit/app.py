@@ -306,15 +306,27 @@ def main() -> None:
         if year_df.empty:
             st.info("No data available.")
         else:
-            zoom = alt.selection_interval(bind="scales", encodings=["x"])
+            min_year = int(year_df["year"].min())
+            max_year = int(year_df["year"].max())
+
+            year_range = st.slider(
+                "Year Range",
+                min_value=min_year,
+                max_value=max_year,
+                value=(min_year, max_year),
+            )
+
+            filtered_year_df = year_df[
+                (year_df["year"] >= year_range[0]) & (year_df["year"] <= year_range[1])
+            ]
+
             chart = (
-                alt.Chart(year_df)
+                alt.Chart(filtered_year_df)
                 .mark_bar()
                 .encode(
-                    x=alt.X("year:Q", title="Year", axis=alt.Axis(format="d")),
+                    x=alt.X("year:O", title="Year"),
                     y=alt.Y("instances:Q", title="Instances", scale=alt.Scale(domainMin=0)),
                 )
-                .add_params(zoom)
             )
             st.altair_chart(chart, use_container_width=True)
 
