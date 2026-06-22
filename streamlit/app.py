@@ -17,6 +17,11 @@ SQL_DIR = Path(__file__).resolve().parent / "sql"
 # Earliest date in the dataset (static — historical data does not change)
 MIN_DATE = date(1978, 10, 1)
 
+MONTH_LABELS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
+
 
 # ── SQL loader ──────────────────────────────────────────────────────────────
 
@@ -107,6 +112,12 @@ def load_game_days(db_path: str, day: str, location_group_id: str) -> pd.DataFra
 def load_instances_by_year(db_path: str) -> pd.DataFrame:
     con = get_con(db_path)
     return con.execute(_read_sql("instances_by_year")).df()
+
+
+@st.cache_data(ttl=60)
+def load_instances_by_year_month(db_path: str) -> pd.DataFrame:
+    con = get_con(db_path)
+    return con.execute(_read_sql("instances_by_year_month")).df()
 
 
 def main() -> None:
@@ -301,11 +312,16 @@ def main() -> None:
             st.dataframe(leaderboard, use_container_width=True)
 
     with chart_col:
-        st.subheader("Instances by Year")
+        st.subheader("Instances")
+
+        # Load both datasets
         year_df = load_instances_by_year(db_path)
+        year_month_df = load_instances_by_year_month(db_path)
+
         if year_df.empty:
             st.info("No data available.")
         else:
+            # Shared year range slider
             min_year = int(year_df["year"].min())
             max_year = int(year_df["year"].max())
 
@@ -317,18 +333,60 @@ def main() -> None:
             )
 
             filtered_year_df = year_df[
-                (year_df["year"] >= year_range[0]) & (year_df["year"] <= year_range[1])
+                (year_df["year"] >= year_range[0])
+                & (year_df["year"] <= year_range[1])
             ]
+            filtered_ym_df = year_month_df[
+                (year_month_df["year"] >= year_range[0])
+                & (year_month_df["year"] <= year_range[1])
+            ].copy()
 
-            chart = (
-                alt.Chart(filtered_year_df)
-                .mark_bar()
-                .encode(
-                    x=alt.X("year:O", title="Year"),
-                    y=alt.Y("instances:Q", title="Instances", scale=alt.Scale(domainMin=0)),
+            tab_year, tab_month = st.tabs(["By Year", "By Month"])
+
+            with tab_year:
+                bar_chart = (
+                    alt.Chart(filtered_year_df)
+                    .mark_bar()
+                    .encode(
+                        x=alt.X("year:O", title="Year"),
+                        y=alt.Y(
+                            "instances:Q",
+                            title="Instances",
+                            scale=alt.Scale(domainMin=0),
+                        ),
+                    )
                 )
-            )
-            st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(bar_chart, use_container_width=True)
+
+            with tab_month:
+                # Map month number to short name for display
+                filtered_ym_df["month_name"] = filtered_ym_df["month"].map(
+                    lambda m: MONTH_LABELS[m - 1]
+                )
+
+                heatmap = (
+                    alt.Chart(filtered_ym_df)
+                    .mark_rect()
+                    .encode(
+                        x=alt.X(
+                            "month_name:O",
+                            title="Month",
+                            sort=MONTH_LABELS,
+                        ),
+                        y=alt.Y("year:O", title="Year", sort="descending"),
+                        color=alt.Color(
+                            "instances:Q",
+                            title="Instances",
+                            scale=alt.Scale(scheme="blues"),
+                        ),
+                        tooltip=[
+                            alt.Tooltip("year:O", title="Year"),
+                            alt.Tooltip("month_name:O", title="Month"),
+                            alt.Tooltip("instances:Q", title="Instances"),
+                        ],
+                    )
+                )
+                st.altair_chart(heatmap, use_container_width=True)
 
 
 if __name__ == "__main__":
