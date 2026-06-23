@@ -120,6 +120,12 @@ def load_instances_by_year_month(db_path: str) -> pd.DataFrame:
     return con.execute(_read_sql("instances_by_year_month")).df()
 
 
+@st.cache_data(ttl=60)
+def load_instances_by_calendar_day(db_path: str) -> pd.DataFrame:
+    con = get_con(db_path)
+    return con.execute(_read_sql("instances_by_calendar_day")).df()
+
+
 def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
     st.title("WhenWin — 3+ Win Days by Region")
@@ -279,7 +285,7 @@ def main() -> None:
                     hide_index=True,
                 )
 
-    # ── 3+ Win Leaderboard & Year Chart ────────────────────────────────────
+    # ── 3+ Win Leaderboard & Charts ──────────────────────────────────────
     st.divider()
 
     lb_col, chart_col = st.columns(2)
@@ -314,9 +320,10 @@ def main() -> None:
     with chart_col:
         st.subheader("Instances")
 
-        # Load both datasets
+        # Load datasets
         year_df = load_instances_by_year(db_path)
         year_month_df = load_instances_by_year_month(db_path)
+        cal_day_df = load_instances_by_calendar_day(db_path)
 
         if year_df.empty:
             st.info("No data available.")
@@ -332,17 +339,27 @@ def main() -> None:
                 value=(min_year, max_year),
             )
 
+            # Filter all datasets by selected year range
             filtered_year_df = year_df[
                 (year_df["year"] >= year_range[0])
                 & (year_df["year"] <= year_range[1])
             ]
+
             filtered_ym_df = year_month_df[
                 (year_month_df["year"] >= year_range[0])
                 & (year_month_df["year"] <= year_range[1])
-            ].copy()
+            ]
 
-            tab_year, tab_month = st.tabs(["By Year", "By Month"])
+            filtered_cal_df = cal_day_df[
+                (cal_day_df["year"] >= year_range[0])
+                & (cal_day_df["year"] <= year_range[1])
+            ]
 
+            tab_year, tab_month, tab_calendar = st.tabs(
+                ["By Year", "By Month", "Calendar"]
+            )
+
+            # ── By Year: bar chart ─────────────────────────────────────────
             with tab_year:
                 bar_chart = (
                     alt.Chart(filtered_year_df)
@@ -358,33 +375,108 @@ def main() -> None:
                 )
                 st.altair_chart(bar_chart, use_container_width=True)
 
+            # ── By Month: 4×3 grid ────────────────────────────────────────
             with tab_month:
-                # Map month number to short name for display
-                filtered_ym_df["month_name"] = filtered_ym_df["month"].map(
+                # Aggregate across years → one value per month
+                month_agg = (
+                    filtered_ym_df.groupby("month")["instances"]
+                    .sum()
+                    .reset_index()
+                )
+                # Ensure all 12 months present
+                all_months = pd.DataFrame({"month": range(1, 13)})
+                month_agg = (
+                    all_months.merge(month_agg, on="month", how="left")
+                    .fillna(0)
+                    .astype({"instances": int})
+                )
+                month_agg["month_name"] = month_agg["month"].map(
+                    lambda m: MONTH_LABELS[m - 1]
+                )
+                # 4 columns × 3 rows  (Jan–Apr | May–Aug | Sep–Dec)
+                month_agg["col"] = (month_agg["month"] - 1) % 4
+                month_agg["row"] = (month_agg["month"] - 1) // 4
+
+                max_instances = int(month_agg["instances"].max()) or 1
+                threshold = max_instances / 2
+
+                base = alt.Chart(month_agg).encode(
+                    x=alt.X("col:O", axis=None),
+                    y=alt.Y("row:O", axis=None),
+                )
+                rects = base.mark_rect(
+                    stroke="white", strokeWidth=3, cornerRadius=6
+                ).encode(
+                    color=alt.Color(
+                        "instances:Q",
+                        title="Instances",
+                        scale=alt.Scale(scheme="blues"),
+                    ),
+                    tooltip=[
+                        alt.Tooltip("month_name:N", title="Month"),
+                        alt.Tooltip("instances:Q", title="Instances"),
+                    ],
+                )
+                month_labels = base.mark_text(
+                    fontSize=14, fontWeight="bold", dy=-8
+                ).encode(
+                    text="month_name:N",
+                    color=alt.condition(
+                        f"datum.instances > {threshold}",
+                        alt.value("white"),
+                        alt.value("#333"),
+                    ),
+                )
+                count_labels = base.mark_text(fontSize=12, dy=10).encode(
+                    text="instances:Q",
+                    color=alt.condition(
+                        f"datum.instances > {threshold}",
+                        alt.value("white"),
+                        alt.value("#555"),
+                    ),
+                )
+
+                grid = (
+                    (rects + month_labels + count_labels)
+                    .properties(height=260)
+                    .configure_view(strokeWidth=0)
+                )
+                st.altair_chart(grid, use_container_width=True)
+
+            # ── Calendar: day-of-month × month heatmap ─────────────────────
+            with tab_calendar:
+                # Aggregate across years → one value per month/day
+                cal_agg = (
+                    filtered_cal_df.groupby(["month", "day"])["instances"]
+                    .sum()
+                    .reset_index()
+                )
+                cal_agg["month_name"] = cal_agg["month"].map(
                     lambda m: MONTH_LABELS[m - 1]
                 )
 
                 heatmap = (
-                    alt.Chart(filtered_ym_df)
-                    .mark_rect()
+                    alt.Chart(cal_agg)
+                    .mark_rect(stroke="white", strokeWidth=0.5)
                     .encode(
-                        x=alt.X(
+                        x=alt.X("day:O", title="Day of Month"),
+                        y=alt.Y(
                             "month_name:O",
-                            title="Month",
+                            title=None,
                             sort=MONTH_LABELS,
                         ),
-                        y=alt.Y("year:O", title="Year", sort="descending"),
                         color=alt.Color(
                             "instances:Q",
                             title="Instances",
                             scale=alt.Scale(scheme="blues"),
                         ),
                         tooltip=[
-                            alt.Tooltip("year:O", title="Year"),
-                            alt.Tooltip("month_name:O", title="Month"),
+                            alt.Tooltip("month_name:N", title="Month"),
+                            alt.Tooltip("day:O", title="Day"),
                             alt.Tooltip("instances:Q", title="Instances"),
                         ],
                     )
+                    .properties(height=340)
                 )
                 st.altair_chart(heatmap, use_container_width=True)
 
