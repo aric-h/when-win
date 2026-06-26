@@ -313,6 +313,8 @@ def main() -> None:
         with toggle_col:
             sweeps_only = st.checkbox("Only Sweeps")
 
+        st.caption("All teams, all time")
+
         # Leaderboard uses unfiltered data — independent of main table filters
         lb_df = load_all_location_game_days(db_path)
         if sweeps_only:
@@ -335,7 +337,7 @@ def main() -> None:
             st.dataframe(leaderboard, use_container_width=True)
 
     with chart_col:
-        st.subheader("Instances")
+        st.subheader("3+ Win Day Frequency")
 
         # Load datasets
         year_df = load_instances_by_year(db_path)
