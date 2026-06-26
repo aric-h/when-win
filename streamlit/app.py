@@ -103,6 +103,16 @@ def load_location_game_days(
 
 
 @st.cache_data(ttl=60)
+def load_all_location_game_days(db_path: str) -> pd.DataFrame:
+    """Load all location game days with no filters (for the leaderboard)."""
+    con = get_con(db_path)
+    sql = _read_sql("location_game_days")
+    sql = f"WITH q AS ({sql}) SELECT * FROM q"
+    sql += " ORDER BY date DESC, winners DESC, leagues_winning DESC, location_group_id"
+    return con.execute(sql).df()
+
+
+@st.cache_data(ttl=60)
 def load_game_days(db_path: str, day: str, location_group_id: str) -> pd.DataFrame:
     con = get_con(db_path)
     return con.execute(_read_sql("game_days"), [day, location_group_id]).df()
@@ -128,7 +138,13 @@ def load_instances_by_calendar_day(db_path: str) -> pd.DataFrame:
 
 def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
-    st.title("WhenWin — 3+ Win Days by Region")
+    st.title("🏆 WhenWin")
+    st.markdown(
+        "Every day since 1978 where **3 or more teams from the same city "
+        "each won a game across 3+ major leagues** (MLB, NBA, NFL, NHL). "
+        "Filter the table below by location, playoff status, clinching wins, "
+        "or date range. Select any row to see full game details."
+    )
 
     db_path = get_db_path()
     if not Path(db_path).exists():
@@ -297,7 +313,8 @@ def main() -> None:
         with toggle_col:
             sweeps_only = st.checkbox("Only Sweeps")
 
-        lb_df = df.copy()
+        # Leaderboard uses unfiltered data — independent of main table filters
+        lb_df = load_all_location_game_days(db_path)
         if sweeps_only:
             lb_df = lb_df[lb_df["sweep_status"] == "Sweep"]
 
