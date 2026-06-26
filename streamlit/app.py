@@ -18,8 +18,18 @@ SQL_DIR = Path(__file__).resolve().parent / "sql"
 MIN_DATE = date(1978, 10, 1)
 
 MONTH_LABELS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 ]
 
 
@@ -363,8 +373,7 @@ def main() -> None:
 
             # Filter all datasets by selected year range
             filtered_year_df = year_df[
-                (year_df["year"] >= year_range[0])
-                & (year_df["year"] <= year_range[1])
+                (year_df["year"] >= year_range[0]) & (year_df["year"] <= year_range[1])
             ]
 
             filtered_ym_df = year_month_df[
@@ -378,7 +387,7 @@ def main() -> None:
             ]
 
             tab_year, tab_month, tab_calendar = st.tabs(
-                ["By Year", "By Month", "Calendar"]
+                ["By Year", "By Month", "By Day"]
             )
 
             # ── By Year: bar chart ─────────────────────────────────────────
@@ -401,9 +410,7 @@ def main() -> None:
             with tab_month:
                 # Aggregate across years → one value per month
                 month_agg = (
-                    filtered_ym_df.groupby("month")["instances"]
-                    .sum()
-                    .reset_index()
+                    filtered_ym_df.groupby("month")["instances"].sum().reset_index()
                 )
                 # Ensure all 12 months present
                 all_months = pd.DataFrame({"month": range(1, 13)})
