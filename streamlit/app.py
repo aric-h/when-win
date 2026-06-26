@@ -210,96 +210,99 @@ def main() -> None:
 
     if df.empty:
         st.info("No results for the selected filters.")
-        return
-
-    # ── Build display dataframe ────────────────────────────────────────────
-    df_view = df[
-        [
-            "date",
-            "location_group_name",
-            "location_group_id",
-            "winners",
-            "teams_playing",
-            "leagues_playing",
-            "sweep_status",
-            "has_playoff_games",
-            "series_clinching_wins",
-            "championship_clinching_wins",
-        ]
-    ].copy()
-
-    # Date → yyyy-mm-dd string (strip timestamp)
-    df_view["date"] = pd.to_datetime(df_view["date"]).dt.strftime("%Y-%m-%d")
-
-    # Sweep as boolean for checkbox column
-    df_view["sweep"] = df_view["sweep_status"] == "Sweep"
-
-    column_config = {
-        "date": st.column_config.TextColumn("Date"),
-        "location_group_name": st.column_config.TextColumn("Location"),
-        "winners": st.column_config.NumberColumn("Wins", format="%d"),
-        "teams_playing": st.column_config.NumberColumn("Teams", format="%d"),
-        "leagues_playing": st.column_config.NumberColumn("Leagues", format="%d"),
-        "sweep": st.column_config.CheckboxColumn("Sweep", disabled=True),
-        "has_playoff_games": st.column_config.CheckboxColumn("Playoffs", disabled=True),
-        "series_clinching_wins": st.column_config.NumberColumn(
-            "Series Clinch", format="%d"
-        ),
-        "championship_clinching_wins": st.column_config.NumberColumn(
-            "Champ Clinch", format="%d"
-        ),
-    }
-
-    selection = st.dataframe(
-        df_view.drop(columns=["location_group_id", "sweep_status"]),
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        column_config=column_config,
-    )
-
-    # ── Day Detail ─────────────────────────────────────────────────────────
-    st.divider()
-    st.subheader("Day Detail")
-
-    if not (selection and selection.selection and selection.selection.get("rows")):
-        st.info("Select a row to see game details")
     else:
-        i = selection.selection["rows"][0]
-        chosen = df.iloc[i]
-        chosen_day = str(chosen["date"])
-        chosen_loc = str(chosen["location_group_id"])
-        chosen_name = str(chosen["location_group_name"])
+        # ── Build display dataframe ────────────────────────────────────────
+        df_view = df[
+            [
+                "date",
+                "location_group_name",
+                "location_group_id",
+                "winners",
+                "teams_playing",
+                "leagues_playing",
+                "sweep_status",
+                "has_playoff_games",
+                "series_clinching_wins",
+                "championship_clinching_wins",
+            ]
+        ].copy()
 
-        st.caption(f"{chosen_day} — {chosen_name}")
-        games = load_game_days(db_path, chosen_day, chosen_loc)
+        # Date → yyyy-mm-dd string (strip timestamp)
+        df_view["date"] = pd.to_datetime(df_view["date"]).dt.strftime("%Y-%m-%d")
 
-        if games.empty:
-            st.info("No games found for that date/location (or results not populated).")
+        # Sweep as boolean for checkbox column
+        df_view["sweep"] = df_view["sweep_status"] == "Sweep"
+
+        column_config = {
+            "date": st.column_config.TextColumn("Date"),
+            "location_group_name": st.column_config.TextColumn("Location"),
+            "winners": st.column_config.NumberColumn("Wins", format="%d"),
+            "teams_playing": st.column_config.NumberColumn("Teams", format="%d"),
+            "leagues_playing": st.column_config.NumberColumn("Leagues", format="%d"),
+            "sweep": st.column_config.CheckboxColumn("Sweep", disabled=True),
+            "has_playoff_games": st.column_config.CheckboxColumn(
+                "Playoffs", disabled=True
+            ),
+            "series_clinching_wins": st.column_config.NumberColumn(
+                "Series Clinch", format="%d"
+            ),
+            "championship_clinching_wins": st.column_config.NumberColumn(
+                "Champ Clinch", format="%d"
+            ),
+        }
+
+        selection = st.dataframe(
+            df_view.drop(columns=["location_group_id", "sweep_status"]),
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            column_config=column_config,
+        )
+
+        # ── Day Detail ─────────────────────────────────────────────────────
+        st.divider()
+        st.subheader("Day Detail")
+
+        if not (selection and selection.selection and selection.selection.get("rows")):
+            st.info("Select a row to see game details")
         else:
-            for league in ["MLB", "NBA", "NFL", "NHL"]:
-                g = games[games["league"] == league]
-                if g.empty:
-                    continue
-                st.markdown(f"### {league}")
-                st.dataframe(
-                    g[
-                        [
-                            "game_type",
-                            "team_label",
-                            "result",
-                            "pts_for",
-                            "pts_against",
-                            "opponent_label",
-                            "playoff_round",
-                            "is_series_clinching",
-                            "is_championship_clinching",
-                        ]
-                    ],
-                    use_container_width=True,
-                    hide_index=True,
+            i = selection.selection["rows"][0]
+            chosen = df.iloc[i]
+            chosen_day = str(chosen["date"])
+            chosen_loc = str(chosen["location_group_id"])
+            chosen_name = str(chosen["location_group_name"])
+
+            st.caption(f"{chosen_day} — {chosen_name}")
+            games = load_game_days(db_path, chosen_day, chosen_loc)
+
+            if games.empty:
+                st.info(
+                    "No games found for that date/location (or results not populated)."
                 )
+            else:
+                for league in ["MLB", "NBA", "NFL", "NHL"]:
+                    g = games[games["league"] == league]
+                    if g.empty:
+                        continue
+                    st.markdown(f"### {league}")
+                    st.dataframe(
+                        g[
+                            [
+                                "game_type",
+                                "team_label",
+                                "result",
+                                "pts_for",
+                                "pts_against",
+                                "opponent_label",
+                                "playoff_round",
+                                "is_series_clinching",
+                                "is_championship_clinching",
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 
     # ── 3+ Win Leaderboard & Charts ──────────────────────────────────────
     st.divider()
