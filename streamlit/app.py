@@ -175,12 +175,13 @@ def main() -> None:
     _KEY_PLAYOFFS = "filter_playoffs"
     _KEY_CLINCH = "filter_clinch"
     _KEY_DATE = "filter_date_range"
-    _FILTER_KEYS = [_KEY_LOCATION, _KEY_PLAYOFFS, _KEY_CLINCH, _KEY_DATE]
 
     def _reset_filters() -> None:
-        """Clear all filter keys so widgets revert to defaults on rerun."""
-        for k in _FILTER_KEYS:
-            st.session_state.pop(k, None)
+        """Set all filter keys to their default values."""
+        st.session_state[_KEY_LOCATION] = "__all__"
+        st.session_state[_KEY_PLAYOFFS] = "Any"
+        st.session_state[_KEY_CLINCH] = "Any"
+        st.session_state[_KEY_DATE] = (MIN_DATE, max_date_bound)
 
     filter_cols = st.columns([2, 2, 2, 2, 1])
     with filter_cols[0]:
