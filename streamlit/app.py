@@ -347,7 +347,13 @@ def main() -> None:
         if leaderboard.empty:
             st.info("No results for the current filters.")
         else:
-            st.dataframe(leaderboard, use_container_width=True)
+            st.dataframe(
+                leaderboard,
+                use_container_width=True,
+                column_config={
+                    "Count": st.column_config.NumberColumn(alignment="center")
+                },
+            )
 
     with chart_col:
         st.subheader("3+ Win Day Frequency")
