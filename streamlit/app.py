@@ -170,17 +170,31 @@ def main() -> None:
 
     max_date_bound = date.today()
 
-    filter_cols = st.columns([2, 2, 2, 2])
+    # Session-state keys for each filter widget
+    _KEY_LOCATION = "filter_location"
+    _KEY_PLAYOFFS = "filter_playoffs"
+    _KEY_CLINCH = "filter_clinch"
+    _KEY_DATE = "filter_date_range"
+    _FILTER_KEYS = [_KEY_LOCATION, _KEY_PLAYOFFS, _KEY_CLINCH, _KEY_DATE]
+
+    def _reset_filters() -> None:
+        """Clear all filter keys so widgets revert to defaults on rerun."""
+        for k in _FILTER_KEYS:
+            st.session_state.pop(k, None)
+
+    filter_cols = st.columns([2, 2, 2, 2, 1])
     with filter_cols[0]:
         location = st.selectbox(
             "Location",
             options=options,
             format_func=lambda x: labels.get(x, x),
+            key=_KEY_LOCATION,
         )
     with filter_cols[1]:
         playoffs_filter = st.selectbox(
             "Playoffs",
             ["Any", "Has Playoff Games", "All Games Playoffs", "No Playoff Games"],
+            key=_KEY_PLAYOFFS,
         )
     with filter_cols[2]:
         clinch_filter = st.selectbox(
@@ -192,6 +206,7 @@ def main() -> None:
                 "Series Clinchers",
                 "Championship Clinchers",
             ],
+            key=_KEY_CLINCH,
         )
     with filter_cols[3]:
         date_range = st.slider(
@@ -200,7 +215,11 @@ def main() -> None:
             max_value=max_date_bound,
             value=(MIN_DATE, max_date_bound),
             format="YYYY-MM-DD",
+            key=_KEY_DATE,
         )
+    with filter_cols[4]:
+        st.markdown("<div style='margin-top: 1.7em'></div>", unsafe_allow_html=True)
+        st.button("↺ Reset", on_click=_reset_filters, use_container_width=True)
 
     # Treat full-range as unfiltered
     min_date = date_range[0] if date_range[0] != MIN_DATE else None
