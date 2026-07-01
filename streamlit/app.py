@@ -37,13 +37,28 @@ MONTH_LABELS = [
 
 
 def _theme_colors() -> dict[str, str]:
-    """Read the active Streamlit theme colors with sensible fallbacks."""
-    return {
-        "primary": st.get_option("theme.primaryColor") or "#a855f7",
-        "bg": st.get_option("theme.backgroundColor") or "#0d1117",
-        "secondary_bg": st.get_option("theme.secondaryBackgroundColor") or "#161b22",
-        "text": st.get_option("theme.textColor") or "#f0f6fc",
-    }
+    """Read the active Streamlit theme colors via st.context.theme.
+
+    Unlike st.get_option(), st.context.theme reflects the *client-side*
+    active theme and updates when the user toggles between dark and light
+    mode — so charts re-register with the correct palette on each rerun.
+    """
+    try:
+        theme = st.context.theme
+        return {
+            "primary": theme.primaryColor or "#a855f7",
+            "bg": theme.backgroundColor or "#0d1117",
+            "secondary_bg": theme.secondaryBackgroundColor or "#161b22",
+            "text": theme.textColor or "#f0f6fc",
+        }
+    except AttributeError:
+        # Fallback for older Streamlit versions without st.context.theme
+        return {
+            "primary": st.get_option("theme.primaryColor") or "#a855f7",
+            "bg": st.get_option("theme.backgroundColor") or "#0d1117",
+            "secondary_bg": st.get_option("theme.secondaryBackgroundColor") or "#161b22",
+            "text": st.get_option("theme.textColor") or "#f0f6fc",
+        }
 
 
 def _register_altair_theme(colors: dict[str, str]) -> None:
@@ -340,7 +355,7 @@ def main() -> None:
             column_config=column_config,
         )
 
-        # ── Day Detail ─────────────────────────────────────────────────────
+        # ── Day Detail ─────────────────────────────────────────────────────────
         st.divider()
         st.subheader("Day Detail")
 
@@ -384,7 +399,7 @@ def main() -> None:
                         hide_index=True,
                     )
 
-    # ── 3+ Win Leaderboard & Charts ──────────────────────────────────────
+    # ── 3+ Win Leaderboard & Charts ──────────────────────────────────────────
     st.divider()
 
     lb_col, chart_col = st.columns(2)
