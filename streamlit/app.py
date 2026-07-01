@@ -33,6 +33,51 @@ MONTH_LABELS = [
 ]
 
 
+# ── Theming ─────────────────────────────────────────────────────────────────
+
+
+def _theme_colors() -> dict[str, str]:
+    """Read the active Streamlit theme colors with sensible fallbacks."""
+    return {
+        "primary": st.get_option("theme.primaryColor") or "#a855f7",
+        "bg": st.get_option("theme.backgroundColor") or "#0d1117",
+        "secondary_bg": st.get_option("theme.secondaryBackgroundColor") or "#161b22",
+        "text": st.get_option("theme.textColor") or "#f0f6fc",
+    }
+
+
+def _register_altair_theme(colors: dict[str, str]) -> None:
+    """Register and enable a custom Altair theme derived from the active
+    Streamlit theme so that charts adapt to dark/light mode automatically."""
+
+    def _build() -> dict:
+        return {
+            "config": {
+                "background": "transparent",
+                "mark": {"color": colors["primary"]},
+                "axis": {
+                    "labelColor": colors["text"],
+                    "titleColor": colors["text"],
+                    "gridColor": colors["secondary_bg"],
+                    "domainColor": colors["text"],
+                    "tickColor": colors["text"],
+                },
+                "legend": {
+                    "labelColor": colors["text"],
+                    "titleColor": colors["text"],
+                },
+                "title": {"color": colors["text"]},
+                "view": {"stroke": "transparent"},
+                "range": {
+                    "heatmap": [colors["secondary_bg"], colors["primary"]],
+                },
+            },
+        }
+
+    alt.themes.register("whenwin", _build)
+    alt.themes.enable("whenwin")
+
+
 # ── SQL loader ──────────────────────────────────────────────────────────────
 
 
@@ -148,6 +193,11 @@ def load_instances_by_calendar_day(db_path: str) -> pd.DataFrame:
 
 def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
+
+    # ── Register Altair theme from active Streamlit theme ──────────────────
+    colors = _theme_colors()
+    _register_altair_theme(colors)
+
     st.title("🏆 WhenWin")
     st.markdown(
         "Every day since 1978 where **3 or more teams from the same city "
@@ -416,6 +466,11 @@ def main() -> None:
                 ["By Year", "By Month", "By Day"]
             )
 
+            # Heatmap color scale: gradient from secondary background → primary
+            heatmap_scale = alt.Scale(
+                range=[colors["secondary_bg"], colors["primary"]],
+            )
+
             # ── By Year: bar chart ─────────────────────────────────────────
             with tab_year:
                 bar_chart = (
@@ -460,12 +515,12 @@ def main() -> None:
                     y=alt.Y("row:O", axis=None),
                 )
                 rects = base.mark_rect(
-                    stroke="white", strokeWidth=3, cornerRadius=6
+                    stroke=colors["bg"], strokeWidth=3, cornerRadius=6
                 ).encode(
                     color=alt.Color(
                         "instances:Q",
                         title="Instances",
-                        scale=alt.Scale(scheme="blues"),
+                        scale=heatmap_scale,
                     ),
                     tooltip=[
                         alt.Tooltip("month_name:N", title="Month"),
@@ -479,7 +534,7 @@ def main() -> None:
                     color=alt.condition(
                         f"datum.instances > {threshold}",
                         alt.value("white"),
-                        alt.value("#333"),
+                        alt.value(colors["text"]),
                     ),
                 )
                 count_labels = base.mark_text(fontSize=12, dy=10).encode(
@@ -487,7 +542,7 @@ def main() -> None:
                     color=alt.condition(
                         f"datum.instances > {threshold}",
                         alt.value("white"),
-                        alt.value("#555"),
+                        alt.value(colors["text"]),
                     ),
                 )
 
@@ -512,7 +567,7 @@ def main() -> None:
 
                 heatmap = (
                     alt.Chart(cal_agg)
-                    .mark_rect(stroke="white", strokeWidth=0.5)
+                    .mark_rect(stroke=colors["bg"], strokeWidth=0.5)
                     .encode(
                         x=alt.X("day:O", title="Day of Month"),
                         y=alt.Y(
@@ -523,7 +578,7 @@ def main() -> None:
                         color=alt.Color(
                             "instances:Q",
                             title="Instances",
-                            scale=alt.Scale(scheme="blues"),
+                            scale=heatmap_scale,
                         ),
                         tooltip=[
                             alt.Tooltip("month_name:N", title="Month"),
