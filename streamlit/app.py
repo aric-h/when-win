@@ -53,14 +53,17 @@ def _theme_colors() -> dict[str, str]:
         }
     except AttributeError:
         # Fallback for older Streamlit versions without st.context.theme
+        print("using fallback colors")
         return {
             "primary": st.get_option("theme.primaryColor") or "#a855f7",
             "bg": st.get_option("theme.backgroundColor") or "#0d1117",
-            "secondary_bg": st.get_option("theme.secondaryBackgroundColor") or "#161b22",
+            "secondary_bg": st.get_option("theme.secondaryBackgroundColor")
+            or "#161b22",
             "text": st.get_option("theme.textColor") or "#f0f6fc",
         }
 
 
+@alt.theme.register("whenwin", enable=True)
 def _register_altair_theme(colors: dict[str, str]) -> None:
     """Register and enable a custom Altair theme derived from the active
     Streamlit theme so that charts adapt to dark/light mode automatically."""
@@ -89,8 +92,8 @@ def _register_altair_theme(colors: dict[str, str]) -> None:
             },
         }
 
-    alt.themes.register("whenwin", _build)
-    alt.themes.enable("whenwin")
+    # alt.theme.register("whenwin", _build)
+    # alt.theme.enable("whenwin")
 
 
 # ── SQL loader ──────────────────────────────────────────────────────────────
@@ -285,7 +288,7 @@ def main() -> None:
         )
     with filter_cols[4]:
         st.markdown("<div style='margin-top: 1.7em'></div>", unsafe_allow_html=True)
-        st.button("↺ Reset", on_click=_reset_filters, use_container_width=True)
+        st.button("↺ Reset", on_click=_reset_filters, width="stretch")
 
     # Treat full-range as unfiltered
     min_date = date_range[0] if date_range[0] != MIN_DATE else None
@@ -348,7 +351,7 @@ def main() -> None:
 
         selection = st.dataframe(
             df_view.drop(columns=["location_group_id", "sweep_status"]),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             on_select="rerun",
             selection_mode="single-row",
@@ -395,7 +398,7 @@ def main() -> None:
                                 "is_championship_clinching",
                             ]
                         ],
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -434,7 +437,7 @@ def main() -> None:
         else:
             st.dataframe(
                 leaderboard,
-                use_container_width=True,
+                width="stretch",
                 column_config={
                     "Count": st.column_config.NumberColumn(alignment="center")
                 },
@@ -500,7 +503,7 @@ def main() -> None:
                         ),
                     )
                 )
-                st.altair_chart(bar_chart, use_container_width=True)
+                st.altair_chart(bar_chart, width="stretch")
 
             # ── By Month: 4×3 grid ────────────────────────────────────────
             with tab_month:
@@ -566,7 +569,7 @@ def main() -> None:
                     .properties(height=260)
                     .configure_view(strokeWidth=0)
                 )
-                st.altair_chart(grid, use_container_width=True)
+                st.altair_chart(grid, width="stretch")
 
             # ── Calendar: day-of-month × month heatmap ─────────────────────
             with tab_calendar:
@@ -603,7 +606,7 @@ def main() -> None:
                     )
                     .properties(height=340)
                 )
-                st.altair_chart(heatmap, use_container_width=True)
+                st.altair_chart(heatmap, width="stretch")
 
 
 if __name__ == "__main__":
