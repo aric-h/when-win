@@ -53,7 +53,6 @@ def _theme_colors() -> dict[str, str]:
         }
     except AttributeError:
         # Fallback for older Streamlit versions without st.context.theme
-        print("using fallback colors")
         return {
             "primary": st.get_option("theme.primaryColor") or "#a855f7",
             "bg": st.get_option("theme.backgroundColor") or "#0d1117",
@@ -64,12 +63,16 @@ def _theme_colors() -> dict[str, str]:
 
 
 @alt.theme.register("whenwin", enable=True)
-def _register_altair_theme(colors: dict[str, str]) -> None:
-    """Register and enable a custom Altair theme derived from the active
-    Streamlit theme so that charts adapt to dark/light mode automatically."""
+def _whenwin_altair_theme() -> alt.theme.ThemeConfig:
+    """Custom Altair theme derived from the active Streamlit theme.
 
-    def _build() -> dict:
-        return {
+    Registered once at import via the decorator.  The function body
+    runs each time Altair applies the theme, so calling _theme_colors()
+    here picks up the current dark/light palette dynamically.
+    """
+    colors = _theme_colors()
+    return alt.theme.ThemeConfig(
+        {
             "config": {
                 "background": "transparent",
                 "mark": {"color": colors["primary"]},
@@ -91,9 +94,7 @@ def _register_altair_theme(colors: dict[str, str]) -> None:
                 },
             },
         }
-
-    # alt.theme.register("whenwin", _build)
-    # alt.theme.enable("whenwin")
+    )
 
 
 # ── SQL loader ──────────────────────────────────────────────────────────────
@@ -212,9 +213,12 @@ def load_instances_by_calendar_day(db_path: str) -> pd.DataFrame:
 def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
 
-    # ── Register Altair theme from active Streamlit theme ──────────────────
+    # ── Read active theme colors for inline chart use ──────────────────────
     colors = _theme_colors()
-    _register_altair_theme(colors)
+
+    # Re-enable the Altair theme each rerun so it picks up the current
+    # dark/light palette from st.context.theme.
+    alt.theme.enable("whenwin")
 
     st.title("🏆 WhenWin")
     st.markdown(
@@ -358,7 +362,7 @@ def main() -> None:
             column_config=column_config,
         )
 
-        # ── Day Detail ─────────────────────────────────────────────────────────
+        # ── Day Detail ─────────────────────────────────────────────────────
         st.divider()
         st.subheader("Day Detail")
 
@@ -402,7 +406,7 @@ def main() -> None:
                         hide_index=True,
                     )
 
-    # ── 3+ Win Leaderboard & Charts ──────────────────────────────────────────
+    # ── 3+ Win Leaderboard & Charts ──────────────────────────────────────
     st.divider()
 
     lb_col, chart_col = st.columns(2)
