@@ -10,6 +10,7 @@ import duckdb
 import pandas as pd
 
 import streamlit as st
+from altair_theme import get_theme_colors
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "local_data" / "whenwin.duckdb"
 SQL_DIR = Path(__file__).resolve().parent / "sql"
@@ -31,70 +32,6 @@ MONTH_LABELS = [
     "Nov",
     "Dec",
 ]
-
-
-# ── Theming ─────────────────────────────────────────────────────────────────
-
-
-def _theme_colors() -> dict[str, str]:
-    """Read the active Streamlit theme colors via st.context.theme.
-
-    Unlike st.get_option(), st.context.theme reflects the *client-side*
-    active theme and updates when the user toggles between dark and light
-    mode — so charts re-register with the correct palette on each rerun.
-    """
-    try:
-        theme = st.context.theme
-        return {
-            "primary": theme.primaryColor or "#a855f7",
-            "bg": theme.backgroundColor or "#0d1117",
-            "secondary_bg": theme.secondaryBackgroundColor or "#161b22",
-            "text": theme.textColor or "#f0f6fc",
-        }
-    except AttributeError:
-        # Fallback for older Streamlit versions without st.context.theme
-        return {
-            "primary": st.get_option("theme.primaryColor") or "#a855f7",
-            "bg": st.get_option("theme.backgroundColor") or "#0d1117",
-            "secondary_bg": st.get_option("theme.secondaryBackgroundColor")
-            or "#161b22",
-            "text": st.get_option("theme.textColor") or "#f0f6fc",
-        }
-
-
-@alt.theme.register("whenwin", enable=True)
-def _whenwin_altair_theme() -> alt.theme.ThemeConfig:
-    """Custom Altair theme derived from the active Streamlit theme.
-
-    Registered once at import via the decorator.  The function body
-    runs each time Altair applies the theme, so calling _theme_colors()
-    here picks up the current dark/light palette dynamically.
-    """
-    colors = _theme_colors()
-    return alt.theme.ThemeConfig(
-        {
-            "config": {
-                "background": "transparent",
-                "mark": {"color": colors["primary"]},
-                "axis": {
-                    "labelColor": colors["text"],
-                    "titleColor": colors["text"],
-                    "gridColor": colors["secondary_bg"],
-                    "domainColor": colors["text"],
-                    "tickColor": colors["text"],
-                },
-                "legend": {
-                    "labelColor": colors["text"],
-                    "titleColor": colors["text"],
-                },
-                "title": {"color": colors["text"]},
-                "view": {"stroke": "transparent"},
-                "range": {
-                    "heatmap": [colors["secondary_bg"], colors["primary"]],
-                },
-            },
-        }
-    )
 
 
 # ── SQL loader ──────────────────────────────────────────────────────────────
@@ -214,11 +151,7 @@ def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
 
     # ── Read active theme colors for inline chart use ──────────────────────
-    colors = _theme_colors()
-
-    # Re-enable the Altair theme each rerun so it picks up the current
-    # dark/light palette from st.context.theme.
-    alt.theme.enable("whenwin")
+    colors = get_theme_colors()
 
     st.title("🏆 WhenWin")
     st.markdown(
