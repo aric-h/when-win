@@ -10,6 +10,7 @@ import duckdb
 import pandas as pd
 
 import streamlit as st
+from altair_theme import get_theme_colors
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "local_data" / "whenwin.duckdb"
 SQL_DIR = Path(__file__).resolve().parent / "sql"
@@ -148,6 +149,10 @@ def load_instances_by_calendar_day(db_path: str) -> pd.DataFrame:
 
 def main() -> None:
     st.set_page_config(page_title="WhenWin", layout="wide")
+
+    # ── Read active theme colors for inline chart use ──────────────────────
+    colors = get_theme_colors()
+
     st.title("🏆 WhenWin")
     st.markdown(
         "Every day since 1978 where **3 or more teams from the same city "
@@ -220,7 +225,7 @@ def main() -> None:
         )
     with filter_cols[4]:
         st.markdown("<div style='margin-top: 1.7em'></div>", unsafe_allow_html=True)
-        st.button("↺ Reset", on_click=_reset_filters, use_container_width=True)
+        st.button("↺ Reset", on_click=_reset_filters, width="stretch")
 
     # Treat full-range as unfiltered
     min_date = date_range[0] if date_range[0] != MIN_DATE else None
@@ -283,7 +288,7 @@ def main() -> None:
 
         selection = st.dataframe(
             df_view.drop(columns=["location_group_id", "sweep_status"]),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             on_select="rerun",
             selection_mode="single-row",
@@ -330,7 +335,7 @@ def main() -> None:
                                 "is_championship_clinching",
                             ]
                         ],
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
 
@@ -369,7 +374,7 @@ def main() -> None:
         else:
             st.dataframe(
                 leaderboard,
-                use_container_width=True,
+                width="stretch",
                 column_config={
                     "Count": st.column_config.NumberColumn(alignment="center")
                 },
@@ -416,6 +421,11 @@ def main() -> None:
                 ["By Year", "By Month", "By Day"]
             )
 
+            # Heatmap color scale: gradient from secondary background → primary
+            heatmap_scale = alt.Scale(
+                range=[colors["secondary_bg"], colors["primary"]],
+            )
+
             # ── By Year: bar chart ─────────────────────────────────────────
             with tab_year:
                 bar_chart = (
@@ -430,7 +440,7 @@ def main() -> None:
                         ),
                     )
                 )
-                st.altair_chart(bar_chart, use_container_width=True)
+                st.altair_chart(bar_chart, width="stretch")
 
             # ── By Month: 4×3 grid ────────────────────────────────────────
             with tab_month:
@@ -460,12 +470,12 @@ def main() -> None:
                     y=alt.Y("row:O", axis=None),
                 )
                 rects = base.mark_rect(
-                    stroke="white", strokeWidth=3, cornerRadius=6
+                    stroke=colors["bg"], strokeWidth=3, cornerRadius=6
                 ).encode(
                     color=alt.Color(
                         "instances:Q",
                         title="Instances",
-                        scale=alt.Scale(scheme="blues"),
+                        scale=heatmap_scale,
                     ),
                     tooltip=[
                         alt.Tooltip("month_name:N", title="Month"),
@@ -479,7 +489,7 @@ def main() -> None:
                     color=alt.condition(
                         f"datum.instances > {threshold}",
                         alt.value("white"),
-                        alt.value("#333"),
+                        alt.value(colors["text"]),
                     ),
                 )
                 count_labels = base.mark_text(fontSize=12, dy=10).encode(
@@ -487,7 +497,7 @@ def main() -> None:
                     color=alt.condition(
                         f"datum.instances > {threshold}",
                         alt.value("white"),
-                        alt.value("#555"),
+                        alt.value(colors["text"]),
                     ),
                 )
 
@@ -496,7 +506,7 @@ def main() -> None:
                     .properties(height=260)
                     .configure_view(strokeWidth=0)
                 )
-                st.altair_chart(grid, use_container_width=True)
+                st.altair_chart(grid, width="stretch")
 
             # ── Calendar: day-of-month × month heatmap ─────────────────────
             with tab_calendar:
@@ -512,7 +522,7 @@ def main() -> None:
 
                 heatmap = (
                     alt.Chart(cal_agg)
-                    .mark_rect(stroke="white", strokeWidth=0.5)
+                    .mark_rect(stroke=colors["bg"], strokeWidth=0.5)
                     .encode(
                         x=alt.X("day:O", title="Day of Month"),
                         y=alt.Y(
@@ -523,7 +533,7 @@ def main() -> None:
                         color=alt.Color(
                             "instances:Q",
                             title="Instances",
-                            scale=alt.Scale(scheme="blues"),
+                            scale=heatmap_scale,
                         ),
                         tooltip=[
                             alt.Tooltip("month_name:N", title="Month"),
@@ -533,7 +543,7 @@ def main() -> None:
                     )
                     .properties(height=340)
                 )
-                st.altair_chart(heatmap, use_container_width=True)
+                st.altair_chart(heatmap, width="stretch")
 
 
 if __name__ == "__main__":
