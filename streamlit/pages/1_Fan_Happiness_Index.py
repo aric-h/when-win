@@ -5,10 +5,12 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+import altair as alt
 import duckdb
 import pandas as pd
 
 import streamlit as st
+from altair_theme import get_theme_colors
 
 from fhi_scoring import Weights, compute_day_scores, compute_summary
 
@@ -17,6 +19,9 @@ SQL_DIR = Path(__file__).resolve().parents[1] / "sql"
 
 # Earliest season in the dataset
 MIN_SEASON = 1978
+
+# Best/worst table size
+TOP_N = 10
 
 
 # ── SQL loader ──────────────────────────────────────────────────────────────
@@ -85,6 +90,9 @@ def main() -> None:
         st.error(f"DuckDB file not found: {db_path}")
         st.stop()
 
+    # ── Read active theme colors ───────────────────────────────────────────
+    colors = get_theme_colors()
+
     # ── Load reference data ────────────────────────────────────────────────
     teams_df = load_teams(db_path)
     presets = load_presets(db_path)
@@ -102,7 +110,7 @@ def main() -> None:
 
     # ── Sidebar ────────────────────────────────────────────────────────────
     with st.sidebar:
-        # ── 1. Team multiselect + preset buttons (#42) ─────────────────────
+        # ── 1. Team multiselect + preset buttons ───────────────────────────
         st.subheader("Team Group")
 
         # Preset buttons
@@ -134,7 +142,7 @@ def main() -> None:
 
         selected_team_ids = [label_to_team_id[l] for l in selected_labels]
 
-        # ── 2. Timeframe slider (#38) ──────────────────────────────────────
+        # ── 2. Timeframe slider ────────────────────────────────────────────
         st.divider()
         season_range = st.slider(
             "Fandom timeframe (seasons)",
@@ -147,7 +155,7 @@ def main() -> None:
             ),
         )
 
-        # ── 3. Algorithm tuning expander (#38) ─────────────────────────────
+        # ── 3. Algorithm tuning expander ───────────────────────────────────
         st.divider()
         with st.expander("⚙️ Tune the algorithm", expanded=False):
             st.markdown("**Base weights**")
@@ -233,14 +241,104 @@ def main() -> None:
     day_df = compute_day_scores(games_df, weights)
     summary = compute_summary(day_df, weights)
 
-    # TODO (#40): hero metric, funnel, chart, best/worst tables
-    # For now, surface the raw outputs so they're visible during dev:
-    st.metric("Fan Happiness Index", f"{summary.total_index:,.1f}")
-    st.caption(
-        f"{summary.total_game_days:,} game days · "
-        f"{summary.days_3plus_teams:,} with 3+ teams · "
-        f"{summary.sweep_days_3plus:,} sweep days"
+    # ── a. Hero total index figure ─────────────────────────────────────────
+    hero_color = "green" if summary.total_index >= 0 else "red"
+    st.markdown(
+        f'<h1 style="color: {hero_color}; font-size: 3.5rem; '
+        f'margin-bottom: 0;">{summary.total_index:+,.1f}</h1>',
+        unsafe_allow_html=True,
     )
+
+    # ── b. Funnel stats row ────────────────────────────────────────────────
+    f1, f2, f3 = st.columns(3)
+
+    with f1:
+        st.metric("Game Days", f"{summary.total_game_days:,}")
+
+    with f2:
+        pct_3plus = (
+            (summary.days_3plus_teams / summary.total_game_days * 100)
+            if summary.total_game_days
+            else 0.0
+        )
+        st.metric(
+            "Days with 3+ Teams",
+            f"{summary.days_3plus_teams:,}",
+            delta=f"{pct_3plus:.1f}% of game days",
+            delta_color="off",
+        )
+
+    with f3:
+        pct_sweep = (
+            (summary.sweep_days_3plus / summary.days_3plus_teams * 100)
+            if summary.days_3plus_teams
+            else 0.0
+        )
+        st.metric(
+            "3+ Team Sweep Days",
+            f"{summary.sweep_days_3plus:,}",
+            delta=f"{pct_sweep:.1f}% of 3+ team days",
+            delta_color="off",
+        )
+
+    # ── c. Cumulative index trend chart ────────────────────────────────────
+    st.divider()
+
+    if not day_df.empty:
+        trend_chart = (
+            alt.Chart(day_df)
+            .mark_line(strokeWidth=1.5)
+            .encode(
+                x=alt.X("date:T", title="Date"),
+                y=alt.Y("cumulative_index:Q", title="Cumulative Index"),
+                tooltip=[
+                    alt.Tooltip("date:T", title="Date"),
+                    alt.Tooltip("cumulative_index:Q", title="Cumulative Index", format=",.1f"),
+                    alt.Tooltip("day_score:Q", title="Day Score", format="+,.1f"),
+                    alt.Tooltip("multiplier:Q", title="Multiplier", format=".2f"),
+                ],
+            )
+            .properties(height=380)
+        )
+        st.altair_chart(trend_chart, use_container_width=True)
+
+    # ── d. Best days / Worst days ──────────────────────────────────────────
+    st.divider()
+    best_col, worst_col = st.columns(2)
+
+    # Prepare display-ready copy
+    display_df = day_df.copy()
+    display_df["date"] = pd.to_datetime(display_df["date"]).dt.strftime("%Y-%m-%d")
+
+    table_columns = ["date", "day_score", "multiplier", "teams_playing_count", "winners_count", "losers_count"]
+    table_config = {
+        "date": st.column_config.TextColumn("Date"),
+        "day_score": st.column_config.NumberColumn("Day Score", format="%+.1f"),
+        "multiplier": st.column_config.NumberColumn("Multiplier", format="%.2f"),
+        "teams_playing_count": st.column_config.NumberColumn("Teams", format="%d"),
+        "winners_count": st.column_config.NumberColumn("Wins", format="%d"),
+        "losers_count": st.column_config.NumberColumn("Losses", format="%d"),
+    }
+
+    with best_col:
+        st.subheader("🟢 Best Days")
+        best = (
+            display_df.nlargest(TOP_N, "day_score")[table_columns]
+            .reset_index(drop=True)
+        )
+        best.index += 1
+        best.index.name = "#"
+        st.dataframe(best, width="stretch", column_config=table_config)
+
+    with worst_col:
+        st.subheader("🔴 Worst Days")
+        worst = (
+            display_df.nsmallest(TOP_N, "day_score")[table_columns]
+            .reset_index(drop=True)
+        )
+        worst.index += 1
+        worst.index.name = "#"
+        st.dataframe(worst, width="stretch", column_config=table_config)
 
 
 if __name__ == "__main__":
