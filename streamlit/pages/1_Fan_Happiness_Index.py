@@ -10,6 +10,8 @@ import pandas as pd
 
 import streamlit as st
 
+from fhi_scoring import Weights, compute_day_scores, compute_summary
+
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "local_data" / "whenwin.duckdb"
 SQL_DIR = Path(__file__).resolve().parents[1] / "sql"
 
@@ -193,7 +195,7 @@ def main() -> None:
                 key="majority_growth",
             )
 
-    # ── Main content area (placeholder for #39 scoring + #40 layout) ──────
+    # ── Main content area ──────────────────────────────────────────────────
     if not selected_team_ids:
         st.info("👈 Select teams in the sidebar to get started.")
         st.stop()
@@ -203,8 +205,42 @@ def main() -> None:
         f"Seasons {season_range[0]}–{season_range[1]}"
     )
 
-    # TODO (#39): scoring engine
+    # ── Load game data (cached; only re-fetched when teams/seasons change)
+    games_df = load_team_group_game_days(
+        db_path, selected_team_ids, season_range[0], season_range[1]
+    )
+
+    if games_df.empty:
+        st.warning("No games found for the selected teams and timeframe.")
+        st.stop()
+
+    # ── Build weights from sidebar values (no DB hit on weight change) ─────
+    weights = Weights(
+        reg_win=w_reg_win,
+        reg_loss=w_reg_loss,
+        reg_tie=w_reg_tie,
+        post_win=w_post_win,
+        post_loss=w_post_loss,
+        clinch_win=w_clinch_win,
+        clinch_loss=w_clinch_loss,
+        champ_win=w_champ_win,
+        champ_loss=w_champ_loss,
+        sweep_growth=sweep_growth,
+        majority_growth=majority_growth,
+    )
+
+    # ── Score ──────────────────────────────────────────────────────────────
+    day_df = compute_day_scores(games_df, weights)
+    summary = compute_summary(day_df, weights)
+
     # TODO (#40): hero metric, funnel, chart, best/worst tables
+    # For now, surface the raw outputs so they're visible during dev:
+    st.metric("Fan Happiness Index", f"{summary.total_index:,.1f}")
+    st.caption(
+        f"{summary.total_game_days:,} game days · "
+        f"{summary.days_3plus_teams:,} with 3+ teams · "
+        f"{summary.sweep_days_3plus:,} sweep days"
+    )
 
 
 if __name__ == "__main__":
