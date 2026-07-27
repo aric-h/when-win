@@ -170,31 +170,70 @@ def main() -> None:
         with st.expander("⚙️ Tune the algorithm", expanded=False):
             st.markdown("**Base weights**")
             w_reg_win = st.number_input(
-                "Regular season win", value=1.0, step=0.5, key="w_reg_win"
+                "Regular season win",
+                value=1.0,
+                step=0.5,
+                key="w_reg_win",
+                help="Points added for each regular season win by a group team.",
             )
             w_reg_loss = st.number_input(
-                "Regular season loss", value=-1.0, step=0.5, key="w_reg_loss"
+                "Regular season loss",
+                value=-1.0,
+                step=0.5,
+                key="w_reg_loss",
+                help="Points added (negative) for each regular season loss.",
             )
             w_reg_tie = st.number_input(
-                "Regular season tie", value=0.5, step=0.5, key="w_reg_tie"
+                "Regular season tie",
+                value=0.5,
+                step=0.5,
+                key="w_reg_tie",
+                help="Points for a regular season tie (mainly historical NFL).",
             )
             w_post_win = st.number_input(
-                "Postseason win", value=3.0, step=0.5, key="w_post_win"
+                "Postseason win",
+                value=3.0,
+                step=0.5,
+                key="w_post_win",
+                help="Points for a postseason win (any round, not series-clinching).",
             )
             w_post_loss = st.number_input(
-                "Postseason loss", value=-3.0, step=0.5, key="w_post_loss"
+                "Postseason loss",
+                value=-3.0,
+                step=0.5,
+                key="w_post_loss",
+                help="Points for a postseason loss (any round, not elimination).",
             )
             w_clinch_win = st.number_input(
-                "Postseason series-clinching win", value=5.0, step=0.5, key="w_clinch_win"
+                "Postseason series-clinching win",
+                value=5.0,
+                step=0.5,
+                key="w_clinch_win",
+                help="Points for winning a series-clinching game (advancing to next round).",
             )
             w_clinch_loss = st.number_input(
-                "Postseason season-ending loss", value=-5.0, step=0.5, key="w_clinch_loss"
+                "Postseason season-ending loss",
+                value=-5.0,
+                step=0.5,
+                key="w_clinch_loss",
+                help="Points for a season-ending elimination loss.",
             )
             w_champ_win = st.number_input(
-                "Championship win", value=10.0, step=0.5, key="w_champ_win"
+                "Championship win",
+                value=10.0,
+                step=0.5,
+                key="w_champ_win",
+                help=(
+                    "Points for winning the championship "
+                    "(Super Bowl, World Series, NBA Finals, Stanley Cup)."
+                ),
             )
             w_champ_loss = st.number_input(
-                "Championship loss", value=-7.0, step=0.5, key="w_champ_loss"
+                "Championship loss",
+                value=-7.0,
+                step=0.5,
+                key="w_champ_loss",
+                help="Points for losing in the championship round (runner-up).",
             )
 
             st.markdown("**Multiplier constants**")
@@ -204,6 +243,14 @@ def main() -> None:
                 step=0.05,
                 format="%.2f",
                 key="sweep_growth",
+                help=(
+                    "Controls the multiplier when ALL teams playing that day "
+                    "win (or all lose). Formula: 1.5 + sweep_growth × (N − 2). "
+                    "Examples with default 0.25: "
+                    "2-team sweep → 1.5×, "
+                    "3-team sweep → 1.75×, "
+                    "4-team sweep → 2.0×."
+                ),
             )
             majority_growth = st.number_input(
                 "Majority growth (majority agreement multiplier)",
@@ -211,6 +258,14 @@ def main() -> None:
                 step=0.05,
                 format="%.2f",
                 key="majority_growth",
+                help=(
+                    "Controls the multiplier when a majority (but not all) of the "
+                    "day's teams agree (all win or all lose). "
+                    "Formula: 1 + majority_growth × (K − 1), where K = agreeing teams. "
+                    "Examples with default 0.30: "
+                    "2-of-3 agree → 1.3×, "
+                    "3-of-4 agree → 1.6×."
+                ),
             )
 
     # ── Main content area ──────────────────────────────────────────────────
