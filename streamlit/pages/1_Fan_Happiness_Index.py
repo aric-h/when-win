@@ -82,7 +82,6 @@ def load_team_group_game_days(
 
 
 def main() -> None:
-    st.set_page_config(page_title="Fan Happiness Index", layout="wide")
     st.title("Fan Happiness Index")
 
     db_path = get_db_path()
@@ -341,5 +340,4 @@ def main() -> None:
         st.dataframe(worst, width="stretch", column_config=table_config)
 
 
-if __name__ == "__main__":
-    main()
+main()
