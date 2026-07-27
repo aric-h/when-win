@@ -82,7 +82,18 @@ def load_team_group_game_days(
 
 
 def main() -> None:
-    st.title("Fan Happiness Index")
+    # Reserve a slot for the title — filled in after scoring (or with default)
+    title_slot = st.empty()
+    title_slot.title("Fan Happiness Index")
+
+    st.markdown(
+        "Track the emotional trajectory of your fandom over time. "
+        "Select a group of teams — the index scores each game day based on "
+        "wins and losses, weighted by significance (regular season, playoffs, "
+        "championships), with bonus multipliers when multiple teams win or "
+        "lose together on the same day. "
+        "Tune the weights in the sidebar to match your gut."
+    )
 
     db_path = get_db_path()
     if not Path(db_path).exists():
@@ -239,6 +250,10 @@ def main() -> None:
     # ── Score ──────────────────────────────────────────────────────────────
     day_df = compute_day_scores(games_df, weights)
     summary = compute_summary(day_df, weights)
+
+    # ── Dynamic title: Happiness when ≥ 0, Misery when < 0 ────────────────
+    title_word = "Happiness" if summary.total_index >= 0 else "Misery"
+    title_slot.title(f"Fan {title_word} Index")
 
     # ── a. Hero total index figure ─────────────────────────────────────────
     hero_color = "green" if summary.total_index >= 0 else "red"
