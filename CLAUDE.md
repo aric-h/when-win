@@ -82,9 +82,19 @@ scripts/
   ingest_mlb_api.py         ← MLB Stats API → team_games
   ingest_postseason_metadata.py  ← all leagues → postseason_series, postseason_game_rounds, is_series_clinching
 streamlit/
-  app.py                    ← local UI (Streamlit); read_only DB connection
+  app.py                    ← navigation entry point (st.navigation); site-wide config & branding
+  win_occurrences.py        ← main page: 3+ Win Occurrences (formerly app.py logic)
+  fhi_scoring.py            ← pure-pandas scoring engine for Fan Happiness Index
+  altair_theme.py           ← shared Altair theme colors
+  pages/
+    1_Fan_Happiness_Index.py ← Fan Happiness Index page
+  sql/                      ← SQL query files loaded at runtime
   requirements.txt          ← pip deps for UI only
 ```
+
+**Streamlit architecture**: Uses `st.navigation` / `st.Page` API. `app.py` is the thin
+entry point — sets `st.set_page_config`, renders the When-Win branding header, then
+delegates to page scripts. Individual page scripts must NOT call `st.set_page_config`.
 
 **Nightly refresh order** (run from repo root with venv active):
 
@@ -129,6 +139,7 @@ Each script auto-detects the latest result date and only fetches forward. All ar
 - **Do not use `postseason_series` for clinch detection in queries** — the old approach joined against that table to infer `is_series_clinching`. That caused fan-out. Use `team_games.is_series_clinching` directly.
 - **Do not invent game_ids** — they must come from the ingestion source. Old MLB IDs use Retrosheet format; new ones use `mlb_<gamePk>`. NBA IDs from 2026 onward use `nba_004XXXXXXXX`; older use `nba_4XXXXXXX` (8 digits). Don't mix.
 - **NFL series table**: NFL is single-elimination; `postseason_series` is not populated for NFL (each game is its own implicit series). Don't query `postseason_series` expecting NFL rows.
+- **Do not call `st.set_page_config` from page scripts** — it is called once in `streamlit/app.py` (the navigation entry point). Page scripts that call it will crash.
 
 ---
 
@@ -166,7 +177,9 @@ All source directories are small (<5k tokens each); no child AGENTS.md files exi
 |------|-----------|
 | Add/fix ingestion | `scripts/api_utils.py` (shared helpers), then the relevant `scripts/ingest_*.py` |
 | Schema change | `sql/schema.sql` (source of truth) + `ALTER TABLE` on live DB |
-| UI / display logic | `streamlit/app.py` (single file) |
+| UI — 3+ Win Occurrences page | `streamlit/win_occurrences.py` |
+| UI — Fan Happiness Index page | `streamlit/pages/1_Fan_Happiness_Index.py` + `streamlit/fhi_scoring.py` |
+| UI — site-wide config/branding | `streamlit/app.py` (navigation entry point) |
 | Analytical query | `sql/basic_queries.sql`, run via `duckdb -readonly local_data/whenwin.duckdb` |
 | Geo-market logic | Join `team_location_groups` — never hardcode city-to-team mappings |
 
