@@ -333,7 +333,7 @@ def main() -> None:
 
     # ── Score ──────────────────────────────────────────────────────────────
     day_df = compute_day_scores(games_df, weights)
-    summary = compute_summary(day_df, weights)
+    summary = compute_summary(day_df, weights, total_games=len(games_df))
 
     # ── Dynamic title: Happiness when ≥ 0, Misery when < 0 ────────────────
     title_word = "Happiness" if summary.total_index >= 0 else "Misery"
@@ -347,37 +347,77 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # ── b. Funnel stats row ────────────────────────────────────────────────
-    f1, f2, f3 = st.columns(3)
+    # ── b. Stats rows ──────────────────────────────────────────────────────
+    # Row 1: Game Days | Total Games | 1-Team Days | 1-Team Win %
+    r1c1, r1c2, r1c3, r1c4 = st.columns(4)
 
-    with f1:
+    with r1c1:
         st.metric("Game Days", f"{summary.total_game_days:,}")
 
-    with f2:
+    with r1c2:
+        st.metric("Total Games", f"{summary.total_games:,}")
+
+    with r1c3:
+        pct_1_team = (
+            (summary.days_1_team / summary.total_game_days * 100)
+            if summary.total_game_days
+            else 0.0
+        )
+        st.metric(
+            "1-Team Days",
+            f"{summary.days_1_team:,}",
+            delta=f"{pct_1_team:.1f}% of game days",
+            delta_color="off",
+        )
+
+    with r1c4:
+        if summary.games_on_1_team_days > 0:
+            win_pct = summary.wins_on_1_team_days / summary.games_on_1_team_days * 100
+            st.metric("1-Team Win %", f"{win_pct:.1f}%")
+        else:
+            st.metric("1-Team Win %", "—")
+
+    # Row 2: 3+ Team Days | 3+ Win Sweeps | 3+ Loss Sweeps |
+    #         2-Team Days | 2-Team Win Sweeps | 2-Team Loss Sweeps
+    r2c1, r2c2, r2c3, r2c4, r2c5, r2c6 = st.columns(6)
+
+    with r2c1:
         pct_3plus = (
             (summary.days_3plus_teams / summary.total_game_days * 100)
             if summary.total_game_days
             else 0.0
         )
         st.metric(
-            "Days with 3+ Teams",
+            "3+ Team Days",
             f"{summary.days_3plus_teams:,}",
             delta=f"{pct_3plus:.1f}% of game days",
             delta_color="off",
         )
 
-    with f3:
-        pct_sweep = (
-            (summary.sweep_days_3plus / summary.days_3plus_teams * 100)
-            if summary.days_3plus_teams
+    with r2c2:
+        st.metric("3+ Win Sweeps", f"{summary.sweep_wins_3plus:,}")
+
+    with r2c3:
+        st.metric("3+ Loss Sweeps", f"{summary.sweep_losses_3plus:,}")
+
+    with r2c4:
+        pct_2_team = (
+            (summary.days_2_teams / summary.total_game_days * 100)
+            if summary.total_game_days
             else 0.0
         )
         st.metric(
-            "3+ Team Sweep Days",
-            f"{summary.sweep_days_3plus:,}",
-            delta=f"{pct_sweep:.1f}% of 3+ team days",
+            "2-Team Days",
+            f"{summary.days_2_teams:,}",
+            delta=f"{pct_2_team:.1f}% of game days",
             delta_color="off",
         )
+
+    with r2c5:
+        st.metric("2-Team Win Sweeps", f"{summary.sweep_wins_2_teams:,}")
+
+    with r2c6:
+        st.metric("2-Team Loss Sweeps", f"{summary.sweep_losses_2_teams:,}")
 
     # ── c. Cumulative index trend chart ────────────────────────────────────
     st.divider()
