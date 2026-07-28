@@ -24,7 +24,7 @@ MIN_SEASON = 1978
 TOP_N = 10
 
 
-# ── SQL loader ──────────────────────────────────────────────────────────────
+# ── SQL loader ──────────────────────────────────────────────────────────────────────────
 
 
 @lru_cache(maxsize=None)
@@ -34,7 +34,7 @@ def _read_sql(name: str) -> str:
     return path.read_text()
 
 
-# ── DB helpers ──────────────────────────────────────────────────────────────
+# ── DB helpers ──────────────────────────────────────────────────────────────────────────
 
 
 def get_db_path() -> str:
@@ -78,7 +78,7 @@ def load_team_group_game_days(
     return con.execute(sql, [team_ids, min_season, max_season]).df()
 
 
-# ── Page ───────────────────────────────────────────────────────────────────
+# ── Page ─────────────────────────────────────────────────────────────────────────────
 
 
 def main() -> None:
@@ -100,10 +100,10 @@ def main() -> None:
         st.error(f"DuckDB file not found: {db_path}")
         st.stop()
 
-    # ── Read active theme colors ───────────────────────────────────────────
+    # ── Read active theme colors ───────────────────────────────────────────────────
     colors = get_theme_colors()
 
-    # ── Load reference data ────────────────────────────────────────────────
+    # ── Load reference data ────────────────────────────────────────────────────────
     teams_df = load_teams(db_path)
     presets = load_presets(db_path)
 
@@ -122,22 +122,28 @@ def main() -> None:
     # Determine max season — use the current calendar year
     max_season = date.today().year
 
-    # ── Sidebar ────────────────────────────────────────────────────────────
+    # ── Sidebar ────────────────────────────────────────────────────────────────────────
     with st.sidebar:
-        # ── 1. Team multiselect + preset buttons ───────────────────────────
+        # ── 1. Team multiselect + preset dropdown ──────────────────────────────
         st.subheader("Team Group")
 
-        # Preset buttons
+        # Preset dropdown
         if presets:
-            preset_cols = st.columns(len(presets))
-            for i, (label, team_ids) in enumerate(presets.items()):
-                with preset_cols[i]:
-                    if st.button(label, use_container_width=True):
-                        st.session_state["fhi_team_selection"] = [
-                            team_id_to_label[tid]
-                            for tid in team_ids
-                            if tid in team_id_to_label
-                        ]
+            preset_names = ["— Choose a preset —"] + list(presets.keys())
+            chosen = st.selectbox(
+                "Presets",
+                preset_names,
+                index=0,
+                key="fhi_preset_select",
+                label_visibility="collapsed",
+            )
+            if chosen != "— Choose a preset —":
+                preset_team_ids = presets[chosen]
+                st.session_state["fhi_team_selection"] = [
+                    team_id_to_label[tid]
+                    for tid in preset_team_ids
+                    if tid in team_id_to_label
+                ]
 
         # League filter buttons
         league_options = ["All", "MLB", "NBA", "NFL", "NHL"]
@@ -181,7 +187,7 @@ def main() -> None:
 
         selected_team_ids = [label_to_team_id[l] for l in selected_labels]
 
-        # ── 2. Timeframe slider ────────────────────────────────────────────
+        # ── 2. Timeframe slider ────────────────────────────────────────────────────
         st.divider()
         season_range = st.slider(
             "Fandom timeframe (seasons)",
@@ -194,7 +200,7 @@ def main() -> None:
             ),
         )
 
-        # ── 3. Algorithm tuning expander ───────────────────────────────────
+        # ── 3. Algorithm tuning expander ───────────────────────────────────────────
         st.divider()
         with st.expander("⚙️ Tune the algorithm", expanded=False):
             st.markdown("**Base weights**")
@@ -297,7 +303,7 @@ def main() -> None:
                 ),
             )
 
-    # ── Main content area ──────────────────────────────────────────────────
+    # ── Main content area ──────────────────────────────────────────────────────────
     if not selected_team_ids:
         st.info("👈 Select teams in the sidebar to get started.")
         st.stop()
@@ -331,7 +337,7 @@ def main() -> None:
         majority_growth=majority_growth,
     )
 
-    # ── Score ──────────────────────────────────────────────────────────────
+    # ── Score ──────────────────────────────────────────────────────────────────────────
     day_df = compute_day_scores(games_df, weights)
     summary = compute_summary(day_df, weights, total_games=len(games_df))
 
@@ -339,7 +345,7 @@ def main() -> None:
     title_word = "Happiness" if summary.total_index >= 0 else "Misery"
     title_slot.title(f"Fan {title_word} Index")
 
-    # ── a. Hero total index figure ─────────────────────────────────────────
+    # ── a. Hero total index figure ─────────────────────────────────────────────
     hero_color = "green" if summary.total_index >= 0 else "red"
     st.markdown(
         f'<h1 style="color: {hero_color}; font-size: 3.5rem; '
@@ -347,7 +353,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # ── b. Stats rows ──────────────────────────────────────────────────────
+    # ── b. Stats rows ──────────────────────────────────────────────────────────
     # Center-align metric text inside bordered containers
     st.markdown(
         """
@@ -486,7 +492,7 @@ def main() -> None:
                 delta_color="off",
             )
 
-    # ── c. Cumulative index trend chart ────────────────────────────────────
+    # ── c. Cumulative index trend chart ────────────────────────────────────────
     st.divider()
 
     if not day_df.empty:
@@ -507,7 +513,7 @@ def main() -> None:
         )
         st.altair_chart(trend_chart, use_container_width=True)
 
-    # ── d. Best days / Worst days ──────────────────────────────────────────
+    # ── d. Best days / Worst days ──────────────────────────────────────────────
     st.divider()
     best_col, worst_col = st.columns(2)
 
@@ -559,7 +565,7 @@ def main() -> None:
             key="worst_selection",
         )
 
-    # ── e. Scoring audit ──────────────────────────────────────────────────
+    # ── e. Scoring audit ──────────────────────────────────────────────────────
     st.divider()
     st.subheader("Scoring Audit")
 
