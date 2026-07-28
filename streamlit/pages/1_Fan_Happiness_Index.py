@@ -111,12 +111,16 @@ def main() -> None:
     teams_df["label"] = (
         teams_df["city"] + " " + teams_df["team_name"] + " (" + teams_df["league"] + ")"
     )
+
+    # Sort alphabetically by city, then team name within the same city
+    teams_df = teams_df.sort_values(["city", "team_name"]).reset_index(drop=True)
+
     team_id_to_label = dict(zip(teams_df["team_id"], teams_df["label"]))
     label_to_team_id = dict(zip(teams_df["label"], teams_df["team_id"]))
     all_labels = teams_df["label"].tolist()
 
-    # Determine max season from DB
-    max_season = int(teams_df["end_year"].max()) if not teams_df.empty else date.today().year
+    # Determine max season — use the current calendar year
+    max_season = date.today().year
 
     # ── Sidebar ────────────────────────────────────────────────────────────
     with st.sidebar:
@@ -135,9 +139,34 @@ def main() -> None:
                             if tid in team_id_to_label
                         ]
 
+        # League filter buttons
+        league_options = ["All", "MLB", "NBA", "NFL", "NHL"]
+        league_filter = st.segmented_control(
+            "Filter by league",
+            league_options,
+            default="All",
+            label_visibility="collapsed",
+        )
+
+        # Build filtered label list based on league selection
+        if league_filter and league_filter != "All":
+            filtered_labels = [l for l in all_labels if f"({league_filter})" in l]
+        else:
+            filtered_labels = all_labels
+
+        # Ensure currently-selected items stay in options so Streamlit
+        # doesn't drop them when the league filter narrows the list
+        current_selection = st.session_state.get("fhi_team_selection", [])
+        if current_selection:
+            merged = list(dict.fromkeys(filtered_labels + current_selection))
+            # Preserve alphabetical order: selected-but-filtered items go at
+            # their natural position in all_labels
+            all_labels_order = {label: idx for idx, label in enumerate(all_labels)}
+            filtered_labels = sorted(merged, key=lambda l: all_labels_order.get(l, 0))
+
         selected_labels = st.multiselect(
             "Select teams",
-            options=all_labels,
+            options=filtered_labels,
             default=None,
             key="fhi_team_selection",
             placeholder="Choose teams...",
