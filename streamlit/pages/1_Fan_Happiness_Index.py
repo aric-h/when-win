@@ -119,8 +119,8 @@ def main() -> None:
     label_to_team_id = dict(zip(teams_df["label"], teams_df["team_id"]))
     all_labels = teams_df["label"].tolist()
 
-    # Determine max season from DB
-    max_season = int(teams_df["end_year"].max()) if not teams_df.empty else date.today().year
+    # Determine max season — use the current calendar year
+    max_season = date.today().year
 
     # ── Sidebar ────────────────────────────────────────────────────────────
     with st.sidebar:
