@@ -1,13 +1,17 @@
 -- Seed preset team groups for FHI (issue #60).
 -- Run manually: duckdb local_data/whenwin.duckdb < sql/seed_preset_groups.sql
 -- Do NOT run while Streamlit is active (single-writer constraint).
+-- Safe to re-run: deletes existing rows before inserting.
 
 -- ── Boston / New England (4 teams, one per league) ────────────────────────
 
-INSERT OR REPLACE INTO team_groups (group_id, description)
+DELETE FROM team_group_members WHERE group_id = 'boston';
+DELETE FROM team_groups WHERE group_id = 'boston';
+
+INSERT INTO team_groups (group_id, description)
 VALUES ('boston', 'Boston / New England');
 
-INSERT OR REPLACE INTO team_group_members (group_id, team_id) VALUES
+INSERT INTO team_group_members (group_id, team_id) VALUES
   ('boston', 'mlb_bos_boston_red_sox'),
   ('boston', 'nba_bos_celtics'),
   ('boston', 'nfl_ne_patriots'),
@@ -15,10 +19,13 @@ INSERT OR REPLACE INTO team_group_members (group_id, team_id) VALUES
 
 -- ── New York Metro (8 teams — no NJ teams per user decision) ──────────────
 
-INSERT OR REPLACE INTO team_groups (group_id, description)
+DELETE FROM team_group_members WHERE group_id = 'new_york';
+DELETE FROM team_groups WHERE group_id = 'new_york';
+
+INSERT INTO team_groups (group_id, description)
 VALUES ('new_york', 'New York Metro');
 
-INSERT OR REPLACE INTO team_group_members (group_id, team_id) VALUES
+INSERT INTO team_group_members (group_id, team_id) VALUES
   -- MLB
   ('new_york', 'mlb_nya_new_york_yankees'),
   ('new_york', 'mlb_nyn_new_york_mets'),
@@ -34,10 +41,13 @@ INSERT OR REPLACE INTO team_group_members (group_id, team_id) VALUES
 
 -- ── LA Metro (16 teams across eras) ───────────────────────────────────────
 
-INSERT OR REPLACE INTO team_groups (group_id, description)
+DELETE FROM team_group_members WHERE group_id = 'los_angeles';
+DELETE FROM team_groups WHERE group_id = 'los_angeles';
+
+INSERT INTO team_groups (group_id, description)
 VALUES ('los_angeles', 'LA Metro');
 
-INSERT OR REPLACE INTO team_group_members (group_id, team_id) VALUES
+INSERT INTO team_group_members (group_id, team_id) VALUES
   -- MLB: Dodgers + all 5 Angels eras
   ('los_angeles', 'mlb_lan_los_angeles_dodgers'),
   ('los_angeles', 'mlb_laa_los_angeles_angels'),
