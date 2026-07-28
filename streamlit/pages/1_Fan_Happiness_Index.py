@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 from altair_theme import get_theme_colors
 
-from fhi_scoring import Weights, compute_day_scores, compute_summary
+from fhi_scoring import Weights, assign_base_weights, compute_day_scores, compute_summary
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "local_data" / "whenwin.duckdb"
 SQL_DIR = Path(__file__).resolve().parents[1] / "sql"
@@ -426,7 +426,14 @@ def main() -> None:
         )
         best.index += 1
         best.index.name = "#"
-        st.dataframe(best, width="stretch", column_config=table_config)
+        best_selection = st.dataframe(
+            best,
+            width="stretch",
+            column_config=table_config,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="best_selection",
+        )
 
     with worst_col:
         st.subheader("🔴 Worst Days")
@@ -436,7 +443,121 @@ def main() -> None:
         )
         worst.index += 1
         worst.index.name = "#"
-        st.dataframe(worst, width="stretch", column_config=table_config)
+        worst_selection = st.dataframe(
+            worst,
+            width="stretch",
+            column_config=table_config,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="worst_selection",
+        )
+
+    # ── e. Scoring audit ──────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Scoring Audit")
+
+    # Determine which table (if any) has a selected row
+    best_rows = (
+        best_selection.selection.get("rows", [])
+        if best_selection and best_selection.selection
+        else []
+    )
+    worst_rows = (
+        worst_selection.selection.get("rows", [])
+        if worst_selection and worst_selection.selection
+        else []
+    )
+
+    # Compare against previous selections to detect which table just changed
+    prev_best = st.session_state.get("_prev_best_rows", [])
+    prev_worst = st.session_state.get("_prev_worst_rows", [])
+    st.session_state["_prev_best_rows"] = list(best_rows)
+    st.session_state["_prev_worst_rows"] = list(worst_rows)
+
+    best_changed = best_rows != prev_best
+    worst_changed = worst_rows != prev_worst
+
+    # Prioritize whichever table was most recently clicked
+    selected_date = None
+    if worst_changed and worst_rows:
+        selected_date = worst.iloc[worst_rows[0]]["date"]
+    elif best_changed and best_rows:
+        selected_date = best.iloc[best_rows[0]]["date"]
+    elif best_rows:
+        selected_date = best.iloc[best_rows[0]]["date"]
+    elif worst_rows:
+        selected_date = worst.iloc[worst_rows[0]]["date"]
+
+    if not selected_date:
+        st.info("Select a row from Best Days or Worst Days to see the scoring breakdown.")
+    else:
+        # Look up day-level stats
+        day_match = display_df[display_df["date"] == selected_date]
+        if day_match.empty:
+            st.warning("No scoring data found for that date.")
+        else:
+            day_info = day_match.iloc[0]
+            multiplier = day_info["multiplier"]
+            day_score = day_info["day_score"]
+            raw_sum = day_info["raw_weight_sum"]
+
+            # Describe the multiplier type
+            if multiplier >= 1.5:
+                mult_desc = f"{multiplier:.2f}× sweep multiplier"
+            elif multiplier > 1.0:
+                mult_desc = f"{multiplier:.2f}× majority multiplier"
+            else:
+                mult_desc = "1.00× (no multiplier)"
+
+            st.markdown(
+                f"**{selected_date}** — Day Score: **{day_score:+,.1f}** ({mult_desc})"
+            )
+
+            # Filter game-level data to the selected date
+            games_date_str = pd.to_datetime(games_df["date"]).dt.strftime("%Y-%m-%d")
+            day_games = games_df[games_date_str == selected_date].copy()
+            day_games = assign_base_weights(day_games, weights)
+
+            # Build the per-team audit table
+            audit_rows = []
+            for _, g in day_games.iterrows():
+                team_label = team_id_to_label.get(g["team_id"], g["team_id"])
+                opp_label = team_id_to_label.get(
+                    g["opponent_team_id"], g["opponent_team_id"]
+                )
+                playoff_round = g.get("playoff_round") or "—"
+                audit_rows.append(
+                    {
+                        "Team": team_label,
+                        "Opponent": opp_label,
+                        "Result": g["result"],
+                        "Game Type": g["game_type"],
+                        "Playoff Round": playoff_round,
+                        "Base Weight": g["base_weight"],
+                    }
+                )
+
+            if audit_rows:
+                audit_df = pd.DataFrame(audit_rows)
+                st.dataframe(
+                    audit_df,
+                    width="stretch",
+                    hide_index=True,
+                    column_config={
+                        "Base Weight": st.column_config.NumberColumn(
+                            "Base Weight", format="%+.1f"
+                        ),
+                    },
+                )
+
+                # Day score math summary
+                st.markdown(
+                    f"**Sum of base weights:** {raw_sum:+,.1f} · "
+                    f"**Multiplier:** {mult_desc} · "
+                    f"**Day score:** {day_score:+,.1f}"
+                )
+            else:
+                st.warning("No game-level data found for this date.")
 
 
 main()
