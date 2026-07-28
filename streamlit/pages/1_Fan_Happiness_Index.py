@@ -468,11 +468,25 @@ def main() -> None:
         else []
     )
 
+    # Compare against previous selections to detect which table just changed
+    prev_best = st.session_state.get("_prev_best_rows", [])
+    prev_worst = st.session_state.get("_prev_worst_rows", [])
+    st.session_state["_prev_best_rows"] = list(best_rows)
+    st.session_state["_prev_worst_rows"] = list(worst_rows)
+
+    best_changed = best_rows != prev_best
+    worst_changed = worst_rows != prev_worst
+
+    # Prioritize whichever table was most recently clicked
     selected_date = None
-    if best_rows:
-        selected_date = best.loc[best_rows[0], "date"]
+    if worst_changed and worst_rows:
+        selected_date = worst.iloc[worst_rows[0]]["date"]
+    elif best_changed and best_rows:
+        selected_date = best.iloc[best_rows[0]]["date"]
+    elif best_rows:
+        selected_date = best.iloc[best_rows[0]]["date"]
     elif worst_rows:
-        selected_date = worst.loc[worst_rows[0], "date"]
+        selected_date = worst.iloc[worst_rows[0]]["date"]
 
     if not selected_date:
         st.info("Select a row from Best Days or Worst Days to see the scoring breakdown.")
