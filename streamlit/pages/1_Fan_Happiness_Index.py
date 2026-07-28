@@ -354,7 +354,6 @@ def main() -> None:
         <style>
         /* Center metric label, value, and delta inside containers */
         [data-testid="stMetric"] {
-            text-align: center;
         }
         [data-testid="stMetricLabel"],
         [data-testid="stMetricValue"],
