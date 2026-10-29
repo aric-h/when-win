@@ -65,7 +65,7 @@ can pick them up and execute without follow-up questions.
 | NHL API | `https://api-web.nhle.com/v1/` — official, free, no auth. Key endpoints: `/schedule/{date}`, `/playoff-bracket/{season}`. |
 | NBA API | `nba_api` Python package wrapping `stats.nba.com`. Add `time.sleep(0.6)` between calls to avoid 429s. |
 | MLB API | `https://statsapi.mlb.com/api/v1/` — official, free, no auth. Key endpoint: `/schedule?sportId=1&...`. |
-| NFL | No official free API. Game data ingested from CSV/GitHub sources. NFL season runs Sept–Feb; no automation gap until next season. |
+| NFL | No official free API. `scripts/ingest_nfl.py` pulls `games.csv` from `nflverse/nfldata` on GitHub (raw.githubusercontent.com, no auth, updated weekly in-season). NFL season runs Sept–Feb. |
 
 ---
 
@@ -80,6 +80,7 @@ scripts/
   ingest_nhl_api.py         ← NHL schedule API → team_games
   ingest_nba_api.py         ← nba_api (stats.nba.com) → team_games
   ingest_mlb_api.py         ← MLB Stats API → team_games
+  ingest_nfl.py             ← nflverse/nfldata games.csv (GitHub) → team_games
   ingest_postseason_metadata.py  ← all leagues → postseason_series, postseason_game_rounds, is_series_clinching
 streamlit/
   app.py                    ← navigation entry point (st.navigation); site-wide config & branding
@@ -103,6 +104,7 @@ pip install -r scripts/requirements.txt  # ensure deps installed
 python scripts/ingest_nhl_api.py
 python scripts/ingest_nba_api.py
 python scripts/ingest_mlb_api.py
+python scripts/ingest_nfl.py
 python scripts/ingest_postseason_metadata.py
 ```
 

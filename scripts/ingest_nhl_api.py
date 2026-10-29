@@ -60,16 +60,22 @@ def api_team_to_city_name(team: dict) -> tuple[str, str]:
     return city, name
 
 
-def fetch_schedule_week(start_date: date, session: requests.Session) -> list[dict]:
-    """Fetch up to one week of schedule data starting at start_date."""
+def fetch_schedule_week(start_date: date, session: requests.Session) -> list[tuple[date, dict]]:
+    """Fetch up to one week of schedule data starting at start_date.
+
+    Returns (scheduled_date, game) pairs using each day's own `date` field —
+    the NHL's authoritative local game date — rather than `startTimeUTC`,
+    which rolls evening West/Central-zone games into the next UTC day.
+    """
     url = f"https://api-web.nhle.com/v1/schedule/{start_date.isoformat()}"
     resp = session.get(url, timeout=10)
     resp.raise_for_status()
     data = resp.json()
     games = []
     for day in data.get("gameWeek", []):
+        day_date = date.fromisoformat(day["date"])
         for g in day.get("games", []):
-            games.append(g)
+            games.append((day_date, g))
     return games
 
 
@@ -103,8 +109,7 @@ def main() -> None:
         games = fetch_schedule_week(current, session)
         time.sleep(0.3)
 
-        for g in games:
-            game_date = date.fromisoformat(g["startTimeUTC"][:10])
+        for game_date, g in games:
             if game_date < start or game_date > end:
                 continue
 
